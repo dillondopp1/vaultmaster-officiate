@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Background -->
+  <rect width="200" height="200" rx="38" ry="38" fill="#1B3A8C"/>
+
+  <!-- T-bar (grey trapezoid at top) -->
+  <polygon points="56,44 144,44 136,62 64,62" fill="#8A9BBF"/>
+  <!-- T stem sides (creates the inverted T-notch in the V gap) -->
+  <polygon points="88,62 112,62 104,80 96,80" fill="#8A9BBF"/>
+
+  <!-- V shape - left arm (white) -->
+  <polygon points="36,58 68,58 108,138 90,138" fill="white"/>
+  <!-- V shape - right arm (silver/grey for depth) -->
+  <polygon points="132,58 164,58 110,138 92,138" fill="#B8C4D8"/>
+
+  <!-- Text: Teton (white) -->
+  <text x="36" y="174" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="white" letter-spacing="0.5">Teton</text>
+  <!-- Text: Vault (grey) -->
+  <text x="101" y="174" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="400" fill="#B8C4D8" letter-spacing="0.5">Vault</text>
+</svg>

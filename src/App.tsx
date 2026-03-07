@@ -7,6 +7,7 @@ import {
   RotateCcw, X, Clock, Download, Zap, Medal, Eye, ArrowRight,
   LogOut, Ruler, Pencil, AlertTriangle,
 } from 'lucide-react';
+import logoSvg from './assets/logo.svg';
 import { cn } from './lib/utils';
 
 // ─── Placement helpers ───────────────────────────────────────────────────────
@@ -582,7 +583,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `vaultmaster-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `teton-vault-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -830,10 +831,8 @@ export default function App() {
       <div className="min-h-screen bg-slate-50 p-4 md:p-8">
         <div className="max-w-lg mx-auto">
           <header className="mb-6 text-center pt-2">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 text-white rounded-2xl mb-4 shadow-lg shadow-blue-200">
-              <Trophy size={28} />
-            </div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">VaultMaster Officiate</h1>
+            <img src={logoSvg} alt="Teton Vault" className="w-20 h-20 mx-auto mb-3 drop-shadow-lg" />
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Teton Vault Officiate</h1>
             <p className="text-slate-500 mt-1 text-sm">Professional pole vault meet management</p>
           </header>
 
@@ -1434,11 +1433,9 @@ export default function App() {
           <div className="flex items-center justify-between gap-2">
             {/* Logo + Timer */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="bg-blue-600 text-white p-2 rounded-lg">
-                <Trophy size={18} />
-              </div>
+              <img src={logoSvg} alt="Teton Vault" className="w-9 h-9 rounded-lg" />
               <div>
-                <h1 className="font-bold text-slate-900 leading-tight text-sm">VaultMaster</h1>
+                <h1 className="font-bold text-slate-900 leading-tight text-sm">Teton Vault</h1>
                 <div className="flex items-center gap-1.5">
                   <Clock size={10} className="text-slate-400" />
                   <span className="text-[10px] text-slate-400 font-mono font-bold">{elapsedTime}</span>
