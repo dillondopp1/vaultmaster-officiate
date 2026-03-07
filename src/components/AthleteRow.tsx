@@ -85,17 +85,25 @@ export const AthleteRow: React.FC<Props> = ({
             </div>
           </div>
           <div className="flex gap-1.5 items-center shrink-0">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className={cn(
-                'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold border',
-                attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
-                attempts[i] === 'X' ? 'bg-rose-500 text-white border-rose-600' :
-                attempts[i] === '-' ? 'bg-slate-400 text-white border-slate-500' :
-                'bg-white text-slate-300 border-blue-200',
-              )}>
-                {attempts[i] ?? ''}
-              </div>
-            ))}
+            {[0, 1, 2].map((i) => {
+              const isLastFilled = attempts.length > 0 && i === attempts.length - 1;
+              return (
+                <div
+                  key={i}
+                  onClick={isLastFilled ? () => onUndo(athlete.id) : undefined}
+                  className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold border',
+                    attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
+                    attempts[i] === 'X' ? 'bg-rose-500 text-white border-rose-600' :
+                    attempts[i] === '-' ? 'bg-slate-400 text-white border-slate-500' :
+                    'bg-white text-slate-300 border-blue-200',
+                    isLastFilled && 'cursor-pointer hover:opacity-70 active:scale-90 transition-all',
+                  )}
+                >
+                  {attempts[i] ?? ''}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -188,18 +196,26 @@ export const AthleteRow: React.FC<Props> = ({
 
         {/* Attempt boxes — compact */}
         <div className="flex gap-1 shrink-0">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className={cn(
-              'w-7 h-7 rounded flex items-center justify-center text-xs font-bold border',
-              attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
-              attempts[i] === 'X' ? 'bg-rose-500 text-white border-rose-600' :
-              attempts[i] === '-' ? 'bg-slate-400 text-white border-slate-500' :
-              isWaiting ? 'bg-slate-50 text-slate-200 border-slate-100' :
-              'bg-slate-100 text-slate-300 border-slate-200',
-            )}>
-              {attempts[i] ?? ''}
-            </div>
-          ))}
+          {[0, 1, 2].map((i) => {
+            const isLastFilled = attempts.length > 0 && i === attempts.length - 1;
+            return (
+              <div
+                key={i}
+                onClick={isLastFilled ? () => onUndo(athlete.id) : undefined}
+                className={cn(
+                  'w-7 h-7 rounded flex items-center justify-center text-xs font-bold border',
+                  attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
+                  attempts[i] === 'X' ? 'bg-rose-500 text-white border-rose-600' :
+                  attempts[i] === '-' ? 'bg-slate-400 text-white border-slate-500' :
+                  isWaiting ? 'bg-slate-50 text-slate-200 border-slate-100' :
+                  'bg-slate-100 text-slate-300 border-slate-200',
+                  isLastFilled && 'cursor-pointer hover:opacity-70 active:scale-90 transition-all',
+                )}
+              >
+                {attempts[i] ?? ''}
+              </div>
+            );
+          })}
         </div>
 
         {/* Icon-only action buttons — compact: Make, Miss, Away only */}
