@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(\"/c/Program Files/nodejs/npm.cmd\" install)",
+      "Bash(\"/c/Program Files/nodejs/npm.cmd\" install --ignore-scripts)",
+      "Bash(npm run build)",
+      "Bash(npm install -g vercel)",
+      "Bash(gh --version)",
+      "Bash(git --version)",
+      "Bash(cmd.exe /c \"git --version\")",
+      "Bash(cmd.exe /c \"winget install --id GitHub.cli --silent --accept-package-agreements --accept-source-agreements\")",
+      "Bash(cmd.exe /c \"gh --version\")",
+      "Bash(cmd.exe /c \"where gh\")",
+      "Bash(cmd.exe /c \"winget install --id GitHub.cli\")",
+      "Bash(git init)",
+      "Bash(git add .)",
+      "Bash(git commit -m \"Initial commit - VaultMaster Officiate\")"
+    ]
+  }
+}
