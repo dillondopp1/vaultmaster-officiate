@@ -586,12 +586,6 @@ export default function App() {
   };
 
   // ─── Entry Height Modal (shared between setup + live screens) ───────────────
-  const imperialHeightButtons: { ft: number; inches: number }[] = [];
-  for (let ft = 6; ft <= 16; ft++) {
-    imperialHeightButtons.push({ ft, inches: 0 });
-    if (ft < 16) imperialHeightButtons.push({ ft, inches: 6 });
-  }
-
   const renderEntryHeightModal = () => {
     if (!editEntryHeightId) return null;
     const athlete = athletes.find(a => a.id === editEntryHeightId);
@@ -604,6 +598,17 @@ export default function App() {
       setEditEntryHeightId(null);
     };
 
+    // Build height list from configured start + increment
+    const startM = parseInputToMeters(startHeightInput, startHeightInchesInput) || (7 * 12 * 0.0254);
+    const incM = parseIncrementToMeters(incrementInput) || (unit === 'imperial' ? 6 * 0.0254 : 0.10);
+    const maxM = unit === 'imperial' ? 20 * 12 * 0.0254 : 6.25;
+    const heightOptions: number[] = [];
+    let h = startM;
+    while (h <= maxM + 0.0001) {
+      heightOptions.push(Number(h.toFixed(4)));
+      h = Number((h + incM).toFixed(4));
+    }
+
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
@@ -615,12 +620,14 @@ export default function App() {
           <div className="p-4 overflow-y-auto flex-1">
             {unit === 'imperial' ? (
               <div className="grid grid-cols-3 gap-1.5">
-                {imperialHeightButtons.map(({ ft, inches }) => {
-                  const meters = Number(((ft * 12 + inches) * 0.0254).toFixed(4));
+                {heightOptions.map((meters) => {
+                  const totalIn = meters / 0.0254;
+                  const ft = Math.floor(totalIn / 12);
+                  const inches = Math.round(totalIn % 12);
                   const isSelected = !!(athlete.entryHeight && Math.abs(athlete.entryHeight - meters) < 0.001);
                   return (
                     <button
-                      key={`${ft}-${inches}`}
+                      key={meters}
                       onClick={() => saveHeight(meters)}
                       className={cn(
                         'py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95',
@@ -635,30 +642,29 @@ export default function App() {
                 })}
               </div>
             ) : (
-              <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                <input
-                  type="number" step="0.01" min="0"
-                  className="flex-1 outline-none text-xl font-bold text-slate-800 bg-transparent"
-                  value={editEntryHeightFt}
-                  onChange={e => setEditEntryHeightFt(e.target.value)}
-                  autoFocus
-                  placeholder="e.g. 2.30"
-                />
-                <span className="text-sm font-bold text-slate-400 shrink-0">m</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {heightOptions.map((meters) => {
+                  const isSelected = !!(athlete.entryHeight && Math.abs(athlete.entryHeight - meters) < 0.001);
+                  return (
+                    <button
+                      key={meters}
+                      onClick={() => saveHeight(meters)}
+                      className={cn(
+                        'py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95',
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700',
+                      )}
+                    >
+                      {meters.toFixed(2)}m
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
 
           <div className="p-4 border-t border-slate-100 space-y-2">
-            {unit === 'metric' && (
-              <button
-                onClick={() => saveHeight(parseInputToMeters(editEntryHeightFt, '0') || undefined)}
-                disabled={!editEntryHeightFt.trim()}
-                className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-40"
-              >
-                Save
-              </button>
-            )}
             <button
               onClick={() => saveHeight(undefined)}
               className="w-full py-2.5 bg-slate-100 text-slate-500 text-sm font-bold rounded-xl hover:bg-slate-200 transition-colors"
