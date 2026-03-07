@@ -37,7 +37,7 @@ export default function App() {
   const [unit, setUnit] = useState<Unit>('metric');
   const [startHeightInput, setStartHeightInput] = useState('2.00');
   const [startHeightInchesInput, setStartHeightInchesInput] = useState('0');
-  const [incrementInput, setIncrementInput] = useState('0.15');
+  const [incrementInput, setIncrementInput] = useState('0.10');
 
   // ─── Live View State ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'jumping' | 'cleared' | 'out' | 'checkedOut'>('jumping');
@@ -652,13 +652,13 @@ export default function App() {
                   </div>
                   <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                     <button
-                      onClick={() => { setUnit('metric'); setStartHeightInput('2.00'); setStartHeightInchesInput('0'); setIncrementInput('0.15'); setNewHeightInput(''); setNewHeightInchesInput('0'); }}
+                      onClick={() => { setUnit('metric'); setStartHeightInput('2.00'); setStartHeightInchesInput('0'); setIncrementInput('0.10'); setNewHeightInput(''); setNewHeightInchesInput('0'); }}
                       className={cn('px-3 py-1 text-xs font-bold rounded-lg transition-all', unit === 'metric' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400')}
                     >
                       Metric
                     </button>
                     <button
-                      onClick={() => { setUnit('imperial'); setStartHeightInput('6'); setStartHeightInchesInput('6'); setIncrementInput('3'); setNewHeightInput(''); setNewHeightInchesInput('0'); }}
+                      onClick={() => { setUnit('imperial'); setStartHeightInput('7'); setStartHeightInchesInput('0'); setIncrementInput('6'); setNewHeightInput(''); setNewHeightInchesInput('0'); }}
                       className={cn('px-3 py-1 text-xs font-bold rounded-lg transition-all', unit === 'imperial' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400')}
                     >
                       Imperial
@@ -667,39 +667,60 @@ export default function App() {
                 </div>
 
                 <div className="space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Start Height ({unit === 'metric' ? 'm' : 'ft/in'})
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number" step="0.01"
-                          placeholder={unit === 'metric' ? 'm' : 'ft'}
-                          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                          value={startHeightInput}
-                          onChange={(e) => setStartHeightInput(e.target.value)}
-                        />
-                        {unit === 'imperial' && (
+                  <div className="space-y-3">
+                    {/* Starting Height */}
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 mb-2.5">
+                        Starting Height <span className="font-normal text-slate-400">— first height athletes attempt</span>
+                      </p>
+                      {unit === 'metric' ? (
+                        <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
                           <input
-                            type="number" step="0.1" placeholder="in"
-                            className="w-20 px-3 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                            value={startHeightInchesInput}
-                            onChange={(e) => setStartHeightInchesInput(e.target.value)}
+                            type="number" step="0.01" min="0"
+                            className="flex-1 outline-none text-xl font-bold text-slate-800 bg-transparent"
+                            value={startHeightInput}
+                            onChange={(e) => setStartHeightInput(e.target.value)}
                           />
-                        )}
-                      </div>
+                          <span className="text-sm font-bold text-slate-400 shrink-0">m</span>
+                        </div>
+                      ) : (
+                        <div className="flex gap-3">
+                          <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                            <input
+                              type="number" step="1" min="0"
+                              className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent"
+                              value={startHeightInput}
+                              onChange={(e) => setStartHeightInput(e.target.value)}
+                            />
+                            <span className="text-sm font-bold text-slate-400 shrink-0">ft</span>
+                          </div>
+                          <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                            <input
+                              type="number" step="1" min="0" max="11"
+                              className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent"
+                              value={startHeightInchesInput}
+                              onChange={(e) => setStartHeightInchesInput(e.target.value)}
+                            />
+                            <span className="text-sm font-bold text-slate-400 shrink-0">in</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Increment ({unit === 'metric' ? 'm' : 'in'})
-                      </label>
-                      <input
-                        type="number" step="0.01"
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                        value={incrementInput}
-                        onChange={(e) => setIncrementInput(e.target.value)}
-                      />
+
+                    {/* Bar Increment */}
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 mb-2.5">
+                        Bar Increment <span className="font-normal text-slate-400">— raised each round</span>
+                      </p>
+                      <div className={cn('flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all', unit === 'imperial' ? 'max-w-[200px]' : '')}>
+                        <input
+                          type="number" step="0.01" min="0"
+                          className="flex-1 outline-none text-xl font-bold text-slate-800 bg-transparent"
+                          value={incrementInput}
+                          onChange={(e) => setIncrementInput(e.target.value)}
+                        />
+                        <span className="text-sm font-bold text-slate-400 shrink-0">{unit === 'metric' ? 'm' : 'in'}</span>
+                      </div>
                     </div>
                   </div>
 
