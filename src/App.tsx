@@ -1096,20 +1096,20 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4">
 
         {/* View Toggle + Jump Order */}
-        <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-fit">
             <button
               onClick={() => setActiveView('athletes')}
-              className={cn('px-5 py-2 rounded-xl text-sm font-bold transition-all', activeView === 'athletes' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+              className={cn('px-4 sm:px-5 py-2 rounded-xl text-sm font-bold transition-all', activeView === 'athletes' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
             >
               Athletes
             </button>
             <button
               onClick={() => setActiveView('leaderboard')}
-              className={cn('px-5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2', activeView === 'leaderboard' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+              className={cn('px-4 sm:px-5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2', activeView === 'leaderboard' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
             >
               <Medal size={14} />
               Standings
@@ -1118,10 +1118,10 @@ export default function App() {
 
           {/* Jump Order indicator */}
           {currentJumperId && activeView === 'athletes' && (
-            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 px-4 py-2 rounded-2xl">
+            <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl sm:w-auto">
               <div>
                 <span className="text-[10px] font-bold text-blue-400 uppercase block">Now Jumping</span>
-                <span className="text-sm font-bold text-blue-700">
+                <span className="text-base font-bold text-blue-700">
                   {(() => {
                     const j = athletes.find(a => a.id === currentJumperId);
                     return j ? `${j.bibNumber ? `#${j.bibNumber} ` : ''}${j.name}` : '—';
@@ -1130,9 +1130,9 @@ export default function App() {
               </div>
               <button
                 onClick={advanceJumper}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 active:scale-95 transition-all"
               >
-                Next <ArrowRight size={12} />
+                Next <ArrowRight size={14} />
               </button>
             </div>
           )}
@@ -1142,7 +1142,7 @@ export default function App() {
         {activeView === 'athletes' && (
           <>
             {/* Tabs */}
-            <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-2xl w-fit border border-slate-200">
+            <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full">
               {([
                 { key: 'jumping', label: 'Jumping', color: 'blue', count: athletes.filter(a => a.status !== 'out' && !(a.results[currentHeight] ?? []).includes('O') && !a.checkedOut).length },
                 { key: 'cleared', label: 'Cleared', color: 'emerald', count: athletes.filter(a => (a.results[currentHeight] ?? []).includes('O')).length },
@@ -1153,7 +1153,7 @@ export default function App() {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={cn(
-                    'px-5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2',
+                    'flex-1 sm:flex-none px-2 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1 sm:gap-2',
                     activeTab === tab.key
                       ? `bg-white text-${tab.color}-600 shadow-sm`
                       : 'text-slate-500 hover:text-slate-700',
@@ -1161,7 +1161,7 @@ export default function App() {
                 >
                   {tab.label}
                   <span className={cn(
-                    'px-2 py-0.5 rounded-full text-[10px]',
+                    'px-1.5 py-0.5 rounded-full text-[10px]',
                     activeTab === tab.key ? `bg-${tab.color}-100 text-${tab.color}-600` : 'bg-slate-200 text-slate-500',
                   )}>
                     {tab.count}
@@ -1172,7 +1172,7 @@ export default function App() {
 
             {/* Athlete Table */}
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="grid grid-cols-[1fr_140px_auto] bg-slate-50 px-4 py-3 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <div className="hidden sm:flex bg-slate-50 px-4 py-3 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider justify-between">
                 <span>Athlete</span>
                 <span>{`Attempts @ ${formatHeight(currentHeight)}`}</span>
                 <span className="pl-4 text-right">Actions</span>
