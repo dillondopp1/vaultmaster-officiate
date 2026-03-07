@@ -614,7 +614,7 @@ export default function App() {
 
           <div className="p-4 overflow-y-auto flex-1">
             {unit === 'imperial' ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {imperialHeightButtons.map(({ ft, inches }) => {
                   const meters = Number(((ft * 12 + inches) * 0.0254).toFixed(4));
                   const isSelected = !!(athlete.entryHeight && Math.abs(athlete.entryHeight - meters) < 0.001);
@@ -623,7 +623,7 @@ export default function App() {
                       key={`${ft}-${inches}`}
                       onClick={() => saveHeight(meters)}
                       className={cn(
-                        'py-3 rounded-2xl font-bold text-sm transition-all active:scale-95',
+                        'py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95',
                         isSelected
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700',
