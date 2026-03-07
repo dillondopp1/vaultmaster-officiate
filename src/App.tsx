@@ -1111,59 +1111,29 @@ export default function App() {
         </div>
       )}
 
-      {/* Five Alive Banner */}
-      {isFiveAliveActive && (
-        <div className="bg-purple-600 px-6 py-2 text-center">
-          <span className="text-white font-black text-sm tracking-widest uppercase flex items-center justify-center gap-2">
-            <Zap size={16} />
-            Five Alive — 5 in active rotation · {athletes.filter(a => a.status !== 'out').length - 5} waiting to enter
-            <Zap size={16} />
-          </span>
-        </div>
-      )}
-
       {/* Main Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4 pb-24">
 
-        {/* View Toggle + Jump Order */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-fit">
+        {/* Now Jumping card */}
+        {currentJumperId && activeView === 'athletes' && (
+          <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl mb-4">
+            <div>
+              <span className="text-[10px] font-bold text-blue-400 uppercase block">Now Jumping</span>
+              <span className="text-base font-bold text-blue-700">
+                {(() => {
+                  const j = athletes.find(a => a.id === currentJumperId);
+                  return j ? `${j.bibNumber ? `#${j.bibNumber} ` : ''}${j.name}` : '—';
+                })()}
+              </span>
+            </div>
             <button
-              onClick={() => setActiveView('athletes')}
-              className={cn('px-4 sm:px-5 py-2 rounded-xl text-sm font-bold transition-all', activeView === 'athletes' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+              onClick={advanceJumper}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 active:scale-95 transition-all"
             >
-              Athletes
-            </button>
-            <button
-              onClick={() => setActiveView('leaderboard')}
-              className={cn('px-4 sm:px-5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2', activeView === 'leaderboard' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-            >
-              <Medal size={14} />
-              Standings
+              Next <ArrowRight size={14} />
             </button>
           </div>
-
-          {/* Jump Order indicator */}
-          {currentJumperId && activeView === 'athletes' && (
-            <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl sm:w-auto">
-              <div>
-                <span className="text-[10px] font-bold text-blue-400 uppercase block">Now Jumping</span>
-                <span className="text-base font-bold text-blue-700">
-                  {(() => {
-                    const j = athletes.find(a => a.id === currentJumperId);
-                    return j ? `${j.bibNumber ? `#${j.bibNumber} ` : ''}${j.name}` : '—';
-                  })()}
-                </span>
-              </div>
-              <button
-                onClick={advanceJumper}
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 active:scale-95 transition-all"
-              >
-                Next <ArrowRight size={14} />
-              </button>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Athletes View */}
         {activeView === 'athletes' && (
@@ -1354,9 +1324,29 @@ export default function App() {
         )}
       </main>
 
-      <footer className="p-6 text-center text-slate-400 text-xs">
-        VaultMaster Officiate &bull; Built for precision and efficiency on the field
-      </footer>
+      {/* Sticky bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-20 flex">
+        <button
+          onClick={() => setActiveView('athletes')}
+          className={cn(
+            'flex-1 flex flex-col items-center py-3 gap-1 transition-colors',
+            activeView === 'athletes' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600',
+          )}
+        >
+          <Users size={22} />
+          <span className="text-[10px] font-bold uppercase">Athletes</span>
+        </button>
+        <button
+          onClick={() => setActiveView('leaderboard')}
+          className={cn(
+            'flex-1 flex flex-col items-center py-3 gap-1 transition-colors',
+            activeView === 'leaderboard' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600',
+          )}
+        >
+          <Medal size={22} />
+          <span className="text-[10px] font-bold uppercase">Standings</span>
+        </button>
+      </nav>
     </div>
   );
 }
