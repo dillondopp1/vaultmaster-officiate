@@ -585,6 +585,98 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  // ─── Entry Height Modal (shared between setup + live screens) ───────────────
+  const imperialHeightButtons: { ft: number; inches: number }[] = [];
+  for (let ft = 6; ft <= 16; ft++) {
+    imperialHeightButtons.push({ ft, inches: 0 });
+    if (ft < 16) imperialHeightButtons.push({ ft, inches: 6 });
+  }
+
+  const renderEntryHeightModal = () => {
+    if (!editEntryHeightId) return null;
+    const athlete = athletes.find(a => a.id === editEntryHeightId);
+    if (!athlete) return null;
+
+    const saveHeight = (meters: number | undefined) => {
+      setAthletes(prev => prev.map(a =>
+        a.id === editEntryHeightId ? { ...a, entryHeight: meters } : a
+      ));
+      setEditEntryHeightId(null);
+    };
+
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+          <div className="p-5 border-b border-slate-100">
+            <h3 className="text-base font-bold text-slate-900">Set Entry Height</h3>
+            <p className="text-sm text-slate-500">{athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}</p>
+          </div>
+
+          <div className="p-4 overflow-y-auto flex-1">
+            {unit === 'imperial' ? (
+              <div className="grid grid-cols-2 gap-2">
+                {imperialHeightButtons.map(({ ft, inches }) => {
+                  const meters = Number(((ft * 12 + inches) * 0.0254).toFixed(4));
+                  const isSelected = !!(athlete.entryHeight && Math.abs(athlete.entryHeight - meters) < 0.001);
+                  return (
+                    <button
+                      key={`${ft}-${inches}`}
+                      onClick={() => saveHeight(meters)}
+                      className={cn(
+                        'py-3 rounded-2xl font-bold text-sm transition-all active:scale-95',
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700',
+                      )}
+                    >
+                      {ft}' {inches === 0 ? '0"' : `${inches}"`}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                <input
+                  type="number" step="0.01" min="0"
+                  className="flex-1 outline-none text-xl font-bold text-slate-800 bg-transparent"
+                  value={editEntryHeightFt}
+                  onChange={e => setEditEntryHeightFt(e.target.value)}
+                  autoFocus
+                  placeholder="e.g. 2.30"
+                />
+                <span className="text-sm font-bold text-slate-400 shrink-0">m</span>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 border-t border-slate-100 space-y-2">
+            {unit === 'metric' && (
+              <button
+                onClick={() => saveHeight(parseInputToMeters(editEntryHeightFt, '0') || undefined)}
+                disabled={!editEntryHeightFt.trim()}
+                className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-40"
+              >
+                Save
+              </button>
+            )}
+            <button
+              onClick={() => saveHeight(undefined)}
+              className="w-full py-2.5 bg-slate-100 text-slate-500 text-sm font-bold rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              Starts at Opening Height
+            </button>
+            <button
+              onClick={() => setEditEntryHeightId(null)}
+              className="w-full py-2.5 text-slate-400 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ─── Setup Screen ────────────────────────────────────────────────────────────
   if (!isStarted) {
     return (
@@ -1004,58 +1096,7 @@ export default function App() {
         )}
       </div>
 
-      {/* Edit Entry Height Modal — also available on setup screen */}
-      {editEntryHeightId && (() => {
-        const athlete = athletes.find(a => a.id === editEntryHeightId);
-        if (!athlete) return null;
-        return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-              <div className="p-6">
-                <h3 className="text-base font-bold text-slate-900 mb-1">Set Entry Height</h3>
-                <p className="text-sm text-slate-500 mb-4">{athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}</p>
-                {unit === 'metric' ? (
-                  <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all mb-4">
-                    <input type="number" step="0.01" min="0" className="flex-1 outline-none text-xl font-bold text-slate-800 bg-transparent" value={editEntryHeightFt} onChange={e => setEditEntryHeightFt(e.target.value)} autoFocus placeholder="e.g. 2.30" />
-                    <span className="text-sm font-bold text-slate-400 shrink-0">m</span>
-                  </div>
-                ) : (
-                  <div className="flex gap-3 mb-4">
-                    <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                      <input type="number" step="1" min="0" className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent" value={editEntryHeightFt} onChange={e => setEditEntryHeightFt(e.target.value)} autoFocus placeholder="ft" />
-                      <span className="text-sm font-bold text-slate-400 shrink-0">ft</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                      <input type="number" step="1" min="0" max="11" className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent" value={editEntryHeightIn} onChange={e => setEditEntryHeightIn(e.target.value)} placeholder="in" />
-                      <span className="text-sm font-bold text-slate-400 shrink-0">in</span>
-                    </div>
-                  </div>
-                )}
-                <p className="text-xs text-slate-400 mb-4">Leave blank to compete from the opening height.</p>
-                <div className="flex gap-3">
-                  <button onClick={() => setEditEntryHeightId(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
-                  <button
-                    onClick={() => {
-                      const parsed = editEntryHeightFt.trim()
-                        ? parseInputToMeters(editEntryHeightFt, unit === 'imperial' ? editEntryHeightIn : '0')
-                        : undefined;
-                      setAthletes(prev => prev.map(a =>
-                        a.id === editEntryHeightId
-                          ? { ...a, entryHeight: parsed && parsed > 0 ? parsed : undefined }
-                          : a
-                      ));
-                      setEditEntryHeightId(null);
-                    }}
-                    className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {renderEntryHeightModal()}
       </>
     );
   }
@@ -1195,74 +1236,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Edit Entry Height Modal */}
-      {editEntryHeightId && (() => {
-        const athlete = athletes.find(a => a.id === editEntryHeightId);
-        if (!athlete) return null;
-        return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-              <div className="p-6">
-                <h3 className="text-base font-bold text-slate-900 mb-1">Edit Entry Height</h3>
-                <p className="text-sm text-slate-500 mb-4">{athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}</p>
-                {unit === 'metric' ? (
-                  <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all mb-4">
-                    <input
-                      type="number" step="0.01" min="0"
-                      className="flex-1 outline-none text-xl font-bold text-slate-800 bg-transparent"
-                      value={editEntryHeightFt}
-                      onChange={e => setEditEntryHeightFt(e.target.value)}
-                      autoFocus
-                    />
-                    <span className="text-sm font-bold text-slate-400 shrink-0">m</span>
-                  </div>
-                ) : (
-                  <div className="flex gap-3 mb-4">
-                    <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                      <input
-                        type="number" step="1" min="0"
-                        className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent"
-                        value={editEntryHeightFt}
-                        onChange={e => setEditEntryHeightFt(e.target.value)}
-                        autoFocus
-                      />
-                      <span className="text-sm font-bold text-slate-400 shrink-0">ft</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                      <input
-                        type="number" step="1" min="0" max="11"
-                        className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent"
-                        value={editEntryHeightIn}
-                        onChange={e => setEditEntryHeightIn(e.target.value)}
-                      />
-                      <span className="text-sm font-bold text-slate-400 shrink-0">in</span>
-                    </div>
-                  </div>
-                )}
-                <div className="flex gap-3">
-                  <button onClick={() => setEditEntryHeightId(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
-                  <button
-                    onClick={() => {
-                      const parsed = editEntryHeightFt.trim()
-                        ? parseInputToMeters(editEntryHeightFt, unit === 'imperial' ? editEntryHeightIn : '0')
-                        : undefined;
-                      setAthletes(prev => prev.map(a =>
-                        a.id === editEntryHeightId
-                          ? { ...a, entryHeight: parsed && parsed > 0 ? parsed : undefined }
-                          : a
-                      ));
-                      setEditEntryHeightId(null);
-                    }}
-                    className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {renderEntryHeightModal()}
 
       {/* Checked-Out Athlete Modal (height advancement) */}
       {checkedOutQueue.length > 0 && (
