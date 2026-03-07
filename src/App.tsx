@@ -1274,22 +1274,14 @@ export default function App() {
 
         {/* Now Jumping card */}
         {currentJumperId && activeView === 'athletes' && (
-          <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl mb-4">
-            <div>
-              <span className="text-[10px] font-bold text-blue-400 uppercase block">Now Jumping</span>
-              <span className="text-base font-bold text-blue-700">
-                {(() => {
-                  const j = athletes.find(a => a.id === currentJumperId);
-                  return j ? `${j.bibNumber ? `#${j.bibNumber} ` : ''}${j.name}` : '—';
-                })()}
-              </span>
-            </div>
-            <button
-              onClick={advanceJumper}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 active:scale-95 transition-all"
-            >
-              Next <ArrowRight size={14} />
-            </button>
+          <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl">
+            <span className="text-[10px] font-bold text-blue-400 uppercase block">Now Jumping</span>
+            <span className="text-base font-bold text-blue-700">
+              {(() => {
+                const j = athletes.find(a => a.id === currentJumperId);
+                return j ? `${j.bibNumber ? `#${j.bibNumber} ` : ''}${j.name}` : '—';
+              })()}
+            </span>
           </div>
         )}
 
