@@ -714,15 +714,35 @@ export default function App() {
                     </div>
                     <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
                       {athletes.map(a => (
-                        <div key={a.id} className="p-3 flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            {a.bibNumber && <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">#{a.bibNumber}</span>}
-                            <div>
-                              <span className="font-medium text-sm">{a.name}</span>
+                        <div key={a.id} className="p-3 flex justify-between items-center gap-2">
+                          <button
+                            onClick={() => {
+                              if (unit === 'imperial' && a.entryHeight) {
+                                const totalIn = a.entryHeight / 0.0254;
+                                setEditEntryHeightFt(String(Math.floor(totalIn / 12)));
+                                setEditEntryHeightIn(String(Math.round(totalIn % 12)));
+                              } else {
+                                setEditEntryHeightFt(a.entryHeight ? a.entryHeight.toFixed(2) : '');
+                                setEditEntryHeightIn('0');
+                              }
+                              setEditEntryHeightId(a.id);
+                            }}
+                            className="flex items-center gap-2 flex-1 min-w-0 text-left hover:bg-slate-50 rounded-lg px-1 -mx-1 transition-colors"
+                          >
+                            {a.bibNumber && <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">#{a.bibNumber}</span>}
+                            <div className="min-w-0 flex-1">
+                              <span className="font-medium text-sm text-slate-800">{a.name}</span>
                               {a.school && <span className="block text-[10px] text-slate-400 uppercase">{a.school}</span>}
                             </div>
-                          </div>
-                          <button onClick={() => removeAthlete(a.id)} className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors">
+                            {a.entryHeight ? (
+                              <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full uppercase shrink-0">
+                                Enters {formatHeight(a.entryHeight)}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-300 shrink-0">Tap to set entry height</span>
+                            )}
+                          </button>
+                          <button onClick={() => removeAthlete(a.id)} className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors shrink-0">
                             <X size={14} />
                           </button>
                         </div>
