@@ -216,6 +216,21 @@ export default function App() {
     return eligible[currentJumperIndex % eligible.length];
   }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex]);
 
+  const upcomingJumpers = useMemo(() => {
+    const eligible = jumpOrderIds.filter(id => {
+      const a = athletes.find(x => x.id === id);
+      if (!a || a.status === 'out' || a.checkedOut) return false;
+      const att = a.results[currentHeight] ?? [];
+      return !att.includes('O') && att.length < 3;
+    });
+    if (eligible.length === 0) return [];
+    const count = Math.min(3, eligible.length);
+    return Array.from({ length: count }, (_, offset) => {
+      const id = eligible[(currentJumperIndex + offset) % eligible.length];
+      return athletes.find(a => a.id === id) ?? null;
+    }).filter((a): a is Athlete => a !== null);
+  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex]);
+
   const filteredAthletes = useMemo(() => {
     const filtered = athletes.filter(athlete => {
       const att = athlete.results[currentHeight] ?? [];
@@ -1273,15 +1288,24 @@ export default function App() {
       <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4 pb-24">
 
         {/* Now Jumping card */}
-        {currentJumperId && activeView === 'athletes' && (
-          <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl">
-            <span className="text-[10px] font-bold text-blue-400 uppercase block">Now Jumping</span>
-            <span className="text-base font-bold text-blue-700">
-              {(() => {
-                const j = athletes.find(a => a.id === currentJumperId);
-                return j ? `${j.bibNumber ? `#${j.bibNumber} ` : ''}${j.name}` : '—';
-              })()}
-            </span>
+        {upcomingJumpers.length > 0 && activeView === 'athletes' && (
+          <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl mb-4 flex items-center gap-4">
+            {upcomingJumpers.map((athlete, i) => {
+              const labels = ['Now Jumping', 'On Deck', 'On Hold'];
+              return (
+                <div key={athlete.id} className="flex items-center gap-4 min-w-0">
+                  {i > 0 && <div className="w-px h-9 bg-blue-200 shrink-0" />}
+                  <div className="min-w-0">
+                    <span className={`text-[10px] font-bold uppercase block ${i === 0 ? 'text-blue-500' : 'text-blue-300'}`}>
+                      {labels[i]}
+                    </span>
+                    <span className={`text-base font-bold truncate block ${i === 0 ? 'text-blue-700' : 'text-blue-400'}`}>
+                      {athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
