@@ -43,6 +43,8 @@ export default function App() {
 
   // ─── Live View State ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'jumping' | 'cleared' | 'out' | 'checkedOut' | 'upcoming'>('jumping');
+  const [setupView, setSetupView] = useState<'main' | 'roster'>('main');
+  const [showRosterCSVImport, setShowRosterCSVImport] = useState(false);
   const [activeView, setActiveView] = useState<'athletes' | 'leaderboard'>('athletes');
   const [jumpOrderIds, setJumpOrderIds] = useState<string[]>([]);
   const [currentJumperIndex, setCurrentJumperIndex] = useState(0);
@@ -685,180 +687,189 @@ export default function App() {
 
   // ─── Setup Screen ────────────────────────────────────────────────────────────
   if (!isStarted) {
-    return (
-      <>
-      <div className="min-h-screen bg-slate-50 p-6 md:p-12">
-        <div className="max-w-4xl mx-auto">
-          <header className="mb-12 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 text-white rounded-2xl mb-6 shadow-lg shadow-blue-200">
-              <Trophy size={32} />
-            </div>
-            <h1 className="text-4xl font-bold text-slate-900 tracking-tight">VaultMaster Officiate</h1>
-            <p className="text-slate-500 mt-2 text-lg">Professional pole vault meet management</p>
-          </header>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Athletes Setup */}
-            <section className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <Users className="text-blue-600" />
-                  <h2 className="text-xl font-bold text-slate-800">1. Setup Athletes</h2>
-                </div>
+    // ─── Roster Sub-Screen ───────────────────────────────────────────────────
+    if (setupView === 'roster') {
+      return (
+        <>
+        <div className="h-screen flex flex-col bg-white overflow-hidden">
+
+          {/* Header */}
+          <div className="flex items-center gap-2 px-3 py-3 bg-white border-b border-slate-100 shrink-0">
+            <button
+              onClick={() => { setSetupView('main'); setShowRosterCSVImport(false); }}
+              className="p-2 -ml-1 rounded-xl text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-bold text-slate-900 leading-tight">Athlete Roster</h2>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                {athletes.length === 0 ? 'No athletes yet' : `${athletes.length} athlete${athletes.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+            <button
+              onClick={loadDemoData}
+              className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg uppercase tracking-wider hover:bg-blue-100 transition-colors"
+            >
+              Demo
+            </button>
+            {athletes.length > 0 && (
+              <button
+                onClick={() => setAthletes([])}
+                className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2.5 py-1.5 rounded-lg uppercase tracking-wider hover:bg-rose-100 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Add Athlete Form */}
+          <div className="px-3 py-3 bg-slate-50 border-b border-slate-100 shrink-0 space-y-2">
+            <form onSubmit={addManualAthlete} className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Bib"
+                  className="w-14 px-2 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm text-center font-bold bg-white"
+                  value={manualBib}
+                  onChange={e => setManualBib(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Athlete name *"
+                  className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                />
                 <button
-                  onClick={loadDemoData}
-                  className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors uppercase tracking-wider"
+                  type="submit"
+                  disabled={!manualName.trim()}
+                  className="w-10 h-10 flex items-center justify-center bg-slate-900 text-white rounded-xl hover:bg-slate-800 disabled:opacity-40 transition-all active:scale-95 shrink-0"
                 >
-                  Load Demo
+                  <Plus size={18} />
                 </button>
               </div>
-
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Manual Entry</h3>
-                  <form onSubmit={addManualAthlete} className="flex flex-col gap-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Bib #"
-                        className="w-20 px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                        value={manualBib}
-                        onChange={(e) => setManualBib(e.target.value)}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Athlete Name"
-                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                        value={manualName}
-                        onChange={(e) => setManualName(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="School (Optional)"
-                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                        value={manualSchool}
-                        onChange={(e) => setManualSchool(e.target.value)}
-                      />
-                    </div>
-                    {/* Entry Height (optional) */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-slate-400 font-bold uppercase">Entry Height <span className="font-normal normal-case">— leave blank to start from opening height</span></p>
-                      {unit === 'metric' ? (
-                        <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                          <input
-                            type="number" step="0.01" min="0"
-                            placeholder="e.g. 2.30"
-                            className="flex-1 outline-none text-sm font-bold text-slate-800 bg-transparent"
-                            value={manualEntryHeightFt}
-                            onChange={e => setManualEntryHeightFt(e.target.value)}
-                          />
-                          <span className="text-xs font-bold text-slate-400 shrink-0">m</span>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <div className="flex-1 flex items-center gap-1 bg-white rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                            <input
-                              type="number" step="1" min="0"
-                              placeholder="ft"
-                              className="w-full outline-none text-sm font-bold text-slate-800 bg-transparent"
-                              value={manualEntryHeightFt}
-                              onChange={e => setManualEntryHeightFt(e.target.value)}
-                            />
-                            <span className="text-xs font-bold text-slate-400 shrink-0">ft</span>
-                          </div>
-                          <div className="flex-1 flex items-center gap-1 bg-white rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                            <input
-                              type="number" step="1" min="0" max="11"
-                              placeholder="in"
-                              className="w-full outline-none text-sm font-bold text-slate-800 bg-transparent"
-                              value={manualEntryHeightIn}
-                              onChange={e => setManualEntryHeightIn(e.target.value)}
-                            />
-                            <span className="text-xs font-bold text-slate-400 shrink-0">in</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={!manualName.trim()}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-bold"
-                      >
-                        <Plus size={16} /> Add Athlete
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100" /></div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-slate-400 font-bold">Or</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Bulk Import</h3>
-                  <CSVImporter onImport={handleImport} unit={unit} />
-                </div>
-
-                {athletes.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Roster ({athletes.length})</h3>
-                      <button onClick={() => setAthletes([])} className="text-[10px] text-rose-500 font-bold uppercase hover:underline">Clear All</button>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
-                      {athletes.map(a => (
-                        <div key={a.id} className="p-3 flex justify-between items-center gap-2">
-                          <button
-                            onClick={() => {
-                              if (unit === 'imperial' && a.entryHeight) {
-                                const totalIn = a.entryHeight / 0.0254;
-                                setEditEntryHeightFt(String(Math.floor(totalIn / 12)));
-                                setEditEntryHeightIn(String(Math.round(totalIn % 12)));
-                              } else {
-                                setEditEntryHeightFt(a.entryHeight ? a.entryHeight.toFixed(2) : '');
-                                setEditEntryHeightIn('0');
-                              }
-                              setEditEntryHeightId(a.id);
-                            }}
-                            className="flex items-center gap-2 flex-1 min-w-0 text-left hover:bg-slate-50 rounded-lg px-1 -mx-1 transition-colors"
-                          >
-                            {a.bibNumber && <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">#{a.bibNumber}</span>}
-                            <div className="min-w-0 flex-1">
-                              <span className="font-medium text-sm text-slate-800">{a.name}</span>
-                              {a.school && <span className="block text-[10px] text-slate-400 uppercase">{a.school}</span>}
-                            </div>
-                            {a.entryHeight ? (
-                              <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full uppercase shrink-0">
-                                Enters {formatHeight(a.entryHeight)}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-slate-300 shrink-0">Tap to set entry height</span>
-                            )}
-                          </button>
-                          <button onClick={() => removeAthlete(a.id)} className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors shrink-0">
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <input
+                type="text"
+                placeholder="School (optional)"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
+                value={manualSchool}
+                onChange={e => setManualSchool(e.target.value)}
+              />
+            </form>
+            <button
+              onClick={() => setShowRosterCSVImport(v => !v)}
+              className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              <Download size={13} />
+              {showRosterCSVImport ? 'Hide CSV Import' : 'Import from CSV'}
+            </button>
+            {showRosterCSVImport && (
+              <div className="pt-1">
+                <CSVImporter onImport={(a) => { handleImport(a); setShowRosterCSVImport(false); }} unit={unit} />
               </div>
-            </section>
+            )}
+          </div>
+
+          {/* Athlete List */}
+          <div className="flex-1 overflow-y-auto">
+            {athletes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-300 pb-20">
+                <Users size={40} className="mb-3" />
+                <p className="font-semibold text-sm">No athletes added yet</p>
+                <p className="text-xs mt-1">Add manually or import CSV above</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {athletes.map(a => (
+                  <div key={a.id} className="flex items-center gap-2 px-3 py-2.5">
+                    <button
+                      onClick={() => setEditEntryHeightId(a.id)}
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    >
+                      {a.bibNumber && (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                          #{a.bibNumber}
+                        </span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-slate-900 truncate leading-tight">{a.name}</p>
+                        {a.school && (
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider truncate leading-tight">{a.school}</p>
+                        )}
+                      </div>
+                      {a.entryHeight ? (
+                        <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full shrink-0 uppercase">
+                          ↳ {formatHeight(a.entryHeight)}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 shrink-0 italic">tap to set height</span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => removeAthlete(a.id)}
+                      className="p-1.5 text-slate-300 hover:text-rose-500 active:scale-90 transition-all shrink-0"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+        {renderEntryHeightModal()}
+        </>
+      );
+    }
+
+    return (
+      <>
+      <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+        <div className="max-w-lg mx-auto">
+          <header className="mb-6 text-center pt-2">
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 text-white rounded-2xl mb-4 shadow-lg shadow-blue-200">
+              <Trophy size={28} />
+            </div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">VaultMaster Officiate</h1>
+            <p className="text-slate-500 mt-1 text-sm">Professional pole vault meet management</p>
+          </header>
+
+          <div className="space-y-4">
+            {/* Roster Navigation Card */}
+            <button
+              onClick={() => setSetupView('roster')}
+              className="w-full flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/30 active:scale-[0.98] transition-all text-left shadow-sm"
+            >
+              <div className={cn(
+                'w-11 h-11 rounded-xl flex items-center justify-center shrink-0',
+                athletes.length > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-50 text-blue-500',
+              )}>
+                <Users size={22} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-900">Manage Roster</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {athletes.length === 0 ? 'Add athletes before starting' : `${athletes.length} athlete${athletes.length !== 1 ? 's' : ''} loaded`}
+                </p>
+              </div>
+              {athletes.length > 0 && (
+                <span className="text-sm font-black text-emerald-600 bg-emerald-50 w-8 h-8 rounded-xl flex items-center justify-center shrink-0">
+                  {athletes.length}
+                </span>
+              )}
+              <ChevronRight size={18} className="text-slate-400 shrink-0" />
+            </button>
 
             {/* Competition Settings */}
-            <section className="space-y-8">
+            <div className="space-y-4">
               <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
                     <BarChart3 className="text-blue-600" />
-                    <h2 className="text-xl font-bold text-slate-800">2. Settings</h2>
+                    <h2 className="text-xl font-bold text-slate-800">Settings</h2>
                   </div>
                   <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                     <button
@@ -1011,15 +1022,16 @@ export default function App() {
                     ))}
                   </div>
 
-                  <button
-                    onClick={startCompetition}
-                    disabled={athletes.length === 0}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
-                  >
-                    Start Meet <ChevronRight size={20} />
-                  </button>
                 </div>
               </div>
+
+            <button
+              onClick={startCompetition}
+              disabled={athletes.length === 0}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+            >
+              Start Meet <ChevronRight size={20} />
+            </button>
 
               {/* Past Meets */}
               {history.length > 0 && (
@@ -1059,7 +1071,7 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </section>
+            </div>
           </div>
         </div>
 
