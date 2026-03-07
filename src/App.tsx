@@ -1289,23 +1289,45 @@ export default function App() {
 
         {/* Now Jumping card */}
         {upcomingJumpers.length > 0 && activeView === 'athletes' && (
-          <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl mb-4 flex items-center gap-4">
-            {upcomingJumpers.map((athlete, i) => {
-              const labels = ['Now Jumping', 'On Deck', 'On Hold'];
-              return (
-                <div key={athlete.id} className="flex items-center gap-4 min-w-0">
-                  {i > 0 && <div className="w-px h-9 bg-blue-200 shrink-0" />}
-                  <div className="min-w-0">
-                    <span className={`text-[10px] font-bold uppercase block ${i === 0 ? 'text-blue-500' : 'text-blue-300'}`}>
-                      {labels[i]}
-                    </span>
-                    <span className={`text-base font-bold truncate block ${i === 0 ? 'text-blue-700' : 'text-blue-400'}`}>
-                      {athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}
-                    </span>
+          <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl mb-4">
+            {/* Mobile: vertical stack */}
+            <div className="flex flex-col sm:hidden gap-0">
+              {upcomingJumpers.map((athlete, i) => {
+                const labels = ['Now Jumping', 'On Deck', 'On Hold'];
+                return (
+                  <div key={athlete.id}>
+                    {i > 0 && <div className="h-px bg-blue-200 my-2" />}
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-bold uppercase shrink-0 w-[72px] ${i === 0 ? 'text-blue-500' : 'text-blue-300'}`}>
+                        {labels[i]}
+                      </span>
+                      <span className={`text-sm font-bold truncate ${i === 0 ? 'text-blue-700' : 'text-blue-400'}`}>
+                        {athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            {/* Desktop: horizontal */}
+            <div className="hidden sm:flex items-center gap-4">
+              {upcomingJumpers.map((athlete, i) => {
+                const labels = ['Now Jumping', 'On Deck', 'On Hold'];
+                return (
+                  <div key={athlete.id} className="flex items-center gap-4 min-w-0">
+                    {i > 0 && <div className="w-px h-9 bg-blue-200 shrink-0" />}
+                    <div className="min-w-0">
+                      <span className={`text-[10px] font-bold uppercase block ${i === 0 ? 'text-blue-500' : 'text-blue-300'}`}>
+                        {labels[i]}
+                      </span>
+                      <span className={`text-base font-bold truncate block ${i === 0 ? 'text-blue-700' : 'text-blue-400'}`}>
+                        {athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
