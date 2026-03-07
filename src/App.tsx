@@ -60,6 +60,9 @@ export default function App() {
     inputValue?: string;
   }>({ type: 'none', title: '', message: '' });
   const [toast, setToast] = useState<string | null>(null);
+  const [showHeightSelector, setShowHeightSelector] = useState(false);
+  const [customAdvanceInput, setCustomAdvanceInput] = useState('');
+  const [customAdvanceInchesInput, setCustomAdvanceInchesInput] = useState('0');
 
   // ─── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -455,7 +458,24 @@ export default function App() {
       setCheckedOutQueue(coAthletes);
       return;
     }
-    doAdvanceHeight();
+    setCustomAdvanceInput('');
+    setCustomAdvanceInchesInput('0');
+    setShowHeightSelector(true);
+  };
+
+  const confirmAdvanceHeight = (targetHeight?: number) => {
+    setShowHeightSelector(false);
+    if (targetHeight !== undefined) {
+      // Jump to a specific selected height
+      setActiveTab('jumping');
+      setCurrentJumperIndex(0);
+      if (!heights.includes(targetHeight)) {
+        setHeights(prev => [...prev, targetHeight].sort((a, b) => a - b));
+      }
+      setCurrentHeight(targetHeight);
+    } else {
+      doAdvanceHeight();
+    }
   };
 
   const handleCheckedOutDecision = (athlete: Athlete, decision: 'pass' | 'eliminate') => {
@@ -632,13 +652,13 @@ export default function App() {
                   </div>
                   <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                     <button
-                      onClick={() => setUnit('metric')}
+                      onClick={() => { setUnit('metric'); setStartHeightInput('2.00'); setStartHeightInchesInput('0'); setIncrementInput('0.15'); setNewHeightInput(''); setNewHeightInchesInput('0'); }}
                       className={cn('px-3 py-1 text-xs font-bold rounded-lg transition-all', unit === 'metric' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400')}
                     >
                       Metric
                     </button>
                     <button
-                      onClick={() => setUnit('imperial')}
+                      onClick={() => { setUnit('imperial'); setStartHeightInput('6'); setStartHeightInchesInput('6'); setIncrementInput('3'); setNewHeightInput(''); setNewHeightInchesInput('0'); }}
                       className={cn('px-3 py-1 text-xs font-bold rounded-lg transition-all', unit === 'imperial' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400')}
                     >
                       Imperial
@@ -686,7 +706,7 @@ export default function App() {
                   {/* Five Alive Toggle */}
                   <div className="flex items-center justify-between p-4 bg-purple-50 rounded-2xl border border-purple-100">
                     <div className="flex items-center gap-3">
-                      <Zap size={18} className="text-purple-600" />
+                      <span className="w-7 h-7 bg-purple-600 text-white rounded-lg flex items-center justify-center font-black text-base">5</span>
                       <div>
                         <p className="font-bold text-slate-800 text-sm">Five Alive</p>
                         <p className="text-[10px] text-slate-500">Only 5 athletes rotate actively at a time; others wait in queue</p>
@@ -712,6 +732,9 @@ export default function App() {
                       <span className="bg-white px-2 text-slate-400 font-bold">Custom Heights</span>
                     </div>
                   </div>
+                  <p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                    Add a one-off height outside the normal sequence — e.g. a record attempt at a non-standard increment. Heights are sorted automatically.
+                  </p>
 
                   <div className="flex gap-2">
                     <div className="flex-1 flex gap-2">
@@ -996,6 +1019,85 @@ export default function App() {
         </div>
       )}
 
+      {/* Height Selector Modal */}
+      {showHeightSelector && (() => {
+        const currentIdx = heights.indexOf(currentHeight);
+        const upcomingHeights = heights.slice(currentIdx + 1);
+        const inc = parseIncrementToMeters(incrementInput) || 0.15;
+        const autoNext = currentIdx < heights.length - 1
+          ? heights[currentIdx + 1]
+          : Number((currentHeight + inc).toFixed(4));
+        return (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+              <div className="p-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">Advance Bar To</h3>
+                <p className="text-xs text-slate-400 mb-4">Select a height or enter a custom one</p>
+
+                {/* Height options */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    onClick={() => confirmAdvanceHeight(autoNext)}
+                    className="px-4 py-3 bg-blue-600 text-white font-mono font-bold rounded-xl hover:bg-blue-700 active:scale-95 transition-all text-sm"
+                  >
+                    {formatHeight(autoNext)} <span className="font-normal opacity-75 text-xs">next</span>
+                  </button>
+                  {upcomingHeights.filter(h => h !== autoNext).slice(0, 5).map(h => (
+                    <button
+                      key={h}
+                      onClick={() => confirmAdvanceHeight(h)}
+                      className="px-4 py-3 bg-slate-100 text-slate-800 font-mono font-bold rounded-xl hover:bg-slate-200 active:scale-95 transition-all text-sm"
+                    >
+                      {formatHeight(h)}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom height input */}
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Custom Height</p>
+                  <div className="flex gap-2">
+                    <div className="flex flex-1 gap-2">
+                      <input
+                        type="number" step="0.01"
+                        placeholder={unit === 'metric' ? 'm' : 'ft'}
+                        className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                        value={customAdvanceInput}
+                        onChange={e => setCustomAdvanceInput(e.target.value)}
+                      />
+                      {unit === 'imperial' && (
+                        <input
+                          type="number" step="0.1" placeholder="in"
+                          className="w-16 px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          value={customAdvanceInchesInput}
+                          onChange={e => setCustomAdvanceInchesInput(e.target.value)}
+                        />
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        const h = parseInputToMeters(customAdvanceInput, customAdvanceInchesInput);
+                        if (h > 0) confirmAdvanceHeight(h);
+                      }}
+                      className="px-4 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 active:scale-95 transition-all text-sm"
+                    >
+                      Set
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowHeightSelector(false)}
+                  className="mt-4 w-full py-3 text-slate-500 font-bold rounded-xl hover:bg-slate-100 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-10 shadow-sm">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
@@ -1050,14 +1152,14 @@ export default function App() {
               {/* Five Alive toggle */}
               <button
                 onClick={() => setFiveAlive(!fiveAlive)}
-                title={fiveAlive ? 'Five Alive ON' : 'Five Alive OFF'}
+                title={fiveAlive ? 'Five Alive ON — tap to disable' : 'Five Alive OFF — tap to enable'}
                 className={cn(
                   'flex items-center gap-1.5 px-2 py-2 sm:px-3 text-xs font-bold rounded-xl transition-all',
                   fiveAlive ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
                 )}
               >
-                <Zap size={14} />
-                <span className="hidden sm:inline">5 Alive</span>
+                <span className="font-black text-sm leading-none">5</span>
+                <span className="hidden sm:inline">Alive</span>
               </button>
 
               <button

@@ -139,10 +139,16 @@ export const AthleteRow: React.FC<Props> = ({
               <span className="text-[10px] font-bold uppercase tracking-wide">{athlete.checkedOut ? 'Check In' : 'Away'}</span>
             </button>
           )}
-          {attempts.length > 0 && !athlete.checkedOut && (
+          {!athlete.checkedOut && (
             <button
-              onClick={() => onUndo(athlete.id)}
-              className="flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-xl bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all active:scale-95"
+              onClick={() => attempts.length > 0 && onUndo(athlete.id)}
+              disabled={attempts.length === 0}
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-xl transition-all',
+                attempts.length > 0
+                  ? 'bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:scale-95'
+                  : 'bg-slate-50 text-slate-200 cursor-not-allowed',
+              )}
             >
               <Trash2 size={22} />
               <span className="text-[10px] font-bold uppercase tracking-wide">Undo</span>
