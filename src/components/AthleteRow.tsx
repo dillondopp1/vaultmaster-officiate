@@ -1,6 +1,6 @@
 import React from 'react';
 import { Athlete, Attempt } from '../types';
-import { Check, X, Minus, Trash2, LogOut, LogIn, Clock, Star } from 'lucide-react';
+import { Check, X, Minus, Trash2, LogOut, LogIn, Clock, Star, Pencil } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface Props {
@@ -13,6 +13,8 @@ interface Props {
   formatHeight: (m: number) => string;
   isCurrentJumper?: boolean;
   isWaiting?: boolean;
+  isUpcoming?: boolean;
+  onEditEntryHeight?: (athleteId: string) => void;
 }
 
 export const AthleteRow: React.FC<Props> = ({
@@ -25,6 +27,8 @@ export const AthleteRow: React.FC<Props> = ({
   formatHeight,
   isCurrentJumper,
   isWaiting,
+  isUpcoming,
+  onEditEntryHeight,
 }) => {
   const isOut = athlete.status === 'out';
   const isFinished = athlete.status === 'finished';
@@ -162,6 +166,40 @@ export const AthleteRow: React.FC<Props> = ({
               <span className="text-[10px] font-bold uppercase tracking-wide">Undo</span>
             </button>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Upcoming athletes: entering at a future height ───────────────────────
+  if (isUpcoming) {
+    return (
+      <div className="px-4 py-2.5 bg-violet-50/50 transition-colors">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate leading-snug text-slate-700">
+              {athlete.bibNumber ? `#${athlete.bibNumber} ${athlete.name}` : athlete.name}
+            </p>
+            <p className="text-[10px] uppercase tracking-wider truncate leading-snug text-slate-400">
+              {athlete.school}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {athlete.entryHeight && (
+              <span className="text-xs font-bold text-violet-700 bg-violet-100 px-2.5 py-1 rounded-full uppercase">
+                Enters at {formatHeight(athlete.entryHeight)}
+              </span>
+            )}
+            {onEditEntryHeight && (
+              <button
+                onClick={() => onEditEntryHeight(athlete.id)}
+                className="p-1.5 bg-slate-100 text-slate-500 rounded-lg hover:bg-violet-100 hover:text-violet-600 active:scale-95 transition-all"
+                title="Edit entry height"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

@@ -5,7 +5,7 @@ import { Athlete, Attempt, Unit } from './types';
 import {
   Plus, ChevronRight, ChevronLeft, Trophy, Users, BarChart3,
   RotateCcw, X, Clock, Download, Zap, Medal, Eye, ArrowRight,
-  LogOut, Ruler,
+  LogOut, Ruler, Pencil, AlertTriangle,
 } from 'lucide-react';
 import { cn } from './lib/utils';
 
@@ -34,13 +34,15 @@ export default function App() {
   const [manualName, setManualName] = useState('');
   const [manualSchool, setManualSchool] = useState('');
   const [manualBib, setManualBib] = useState('');
+  const [manualEntryHeightFt, setManualEntryHeightFt] = useState('');
+  const [manualEntryHeightIn, setManualEntryHeightIn] = useState('0');
   const [unit, setUnit] = useState<Unit>('metric');
   const [startHeightInput, setStartHeightInput] = useState('2.00');
   const [startHeightInchesInput, setStartHeightInchesInput] = useState('0');
   const [incrementInput, setIncrementInput] = useState('0.10');
 
   // ─── Live View State ────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<'jumping' | 'cleared' | 'out' | 'checkedOut'>('jumping');
+  const [activeTab, setActiveTab] = useState<'jumping' | 'cleared' | 'out' | 'checkedOut' | 'upcoming'>('jumping');
   const [activeView, setActiveView] = useState<'athletes' | 'leaderboard'>('athletes');
   const [jumpOrderIds, setJumpOrderIds] = useState<string[]>([]);
   const [currentJumperIndex, setCurrentJumperIndex] = useState(0);
@@ -64,6 +66,13 @@ export default function App() {
   const [customAdvanceInput, setCustomAdvanceInput] = useState('');
   const [customAdvanceInchesInput, setCustomAdvanceInchesInput] = useState('0');
   const [undoConfirmId, setUndoConfirmId] = useState<string | null>(null);
+
+  // ─── Run-Through & Edit Entry Height ────────────────────────────────────────
+  const [runThroughAthletes, setRunThroughAthletes] = useState<Athlete[]>([]);
+  const [pendingAdvanceHeight, setPendingAdvanceHeight] = useState<number | null>(null);
+  const [editEntryHeightId, setEditEntryHeightId] = useState<string | null>(null);
+  const [editEntryHeightFt, setEditEntryHeightFt] = useState('');
+  const [editEntryHeightIn, setEditEntryHeightIn] = useState('0');
 
   // ─── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -209,6 +218,7 @@ export default function App() {
     const eligible = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
       if (!a || a.status === 'out' || a.checkedOut) return false;
+      if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
       return !att.includes('O') && att.length < 3;
     });
@@ -220,6 +230,7 @@ export default function App() {
     const eligible = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
       if (!a || a.status === 'out' || a.checkedOut) return false;
+      if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
       return !att.includes('O') && att.length < 3;
     });
@@ -236,10 +247,12 @@ export default function App() {
       const att = athlete.results[currentHeight] ?? [];
       const hasCleared = att.includes('O');
       const isOut = athlete.status === 'out';
-      if (activeTab === 'jumping') return !isOut && !hasCleared && !athlete.checkedOut;
+      const isUpcoming = !!(athlete.entryHeight && athlete.entryHeight > currentHeight);
+      if (activeTab === 'jumping') return !isOut && !hasCleared && !athlete.checkedOut && !isUpcoming;
       if (activeTab === 'cleared') return hasCleared;
       if (activeTab === 'out') return isOut;
       if (activeTab === 'checkedOut') return !!athlete.checkedOut && !isOut;
+      if (activeTab === 'upcoming') return isUpcoming && !isOut;
       return true;
     });
 
@@ -278,6 +291,9 @@ export default function App() {
   const addManualAthlete = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!manualName.trim()) return;
+    const parsedEntryHeight = manualEntryHeightFt.trim()
+      ? parseInputToMeters(manualEntryHeightFt.trim(), unit === 'imperial' ? manualEntryHeightIn : '0')
+      : undefined;
     setAthletes(prev => [...prev, {
       id: crypto.randomUUID(),
       name: manualName.trim(),
@@ -286,10 +302,13 @@ export default function App() {
       results: {},
       status: 'active',
       consecutiveMisses: 0,
+      ...(parsedEntryHeight && parsedEntryHeight > 0 ? { entryHeight: parsedEntryHeight } : {}),
     }]);
     setManualName('');
     setManualSchool('');
     setManualBib('');
+    setManualEntryHeightFt('');
+    setManualEntryHeightIn('0');
   };
 
   const removeAthlete = (id: string) => setAthletes(prev => prev.filter(a => a.id !== id));
@@ -386,6 +405,7 @@ export default function App() {
     const eligibleBefore = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
       if (!a || a.status === 'out' || a.checkedOut) return false;
+      if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
       return !att.includes('O') && att.length < 3;
     });
@@ -444,24 +464,29 @@ export default function App() {
   const advanceJumper = () => setCurrentJumperIndex(prev => prev + 1);
 
   // ─── Height Navigation ───────────────────────────────────────────────────────
-  const doAdvanceHeight = () => {
-    const idx = heights.indexOf(currentHeight);
+  const doAdvanceHeightTo = (targetHeight: number) => {
     setActiveTab('jumping');
     setCurrentJumperIndex(0);
-    if (idx < heights.length - 1) {
-      setCurrentHeight(heights[idx + 1]);
-    } else {
-      const inc = parseIncrementToMeters(incrementInput) || 0.15;
-      const nextH = Number((currentHeight + inc).toFixed(4));
-      setHeights(prev => [...prev, nextH]);
-      setCurrentHeight(nextH);
+    if (!heights.includes(targetHeight)) {
+      setHeights(prev => [...prev, targetHeight].sort((a, b) => a - b));
     }
+    setCurrentHeight(targetHeight);
+  };
+
+  const doAdvanceHeight = () => {
+    const idx = heights.indexOf(currentHeight);
+    const inc = parseIncrementToMeters(incrementInput) || 0.15;
+    const nextH = idx < heights.length - 1
+      ? heights[idx + 1]
+      : Number((currentHeight + inc).toFixed(4));
+    doAdvanceHeightTo(nextH);
   };
 
   // Gate: ensure all athletes are done before advancing
   const tryAdvanceHeight = () => {
     const notDone = athletes.filter(a => {
       if (a.status === 'out' || a.checkedOut) return false;
+      if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
       return !att.includes('O') && att.length < 3;
     });
@@ -481,17 +506,26 @@ export default function App() {
 
   const confirmAdvanceHeight = (targetHeight?: number) => {
     setShowHeightSelector(false);
-    if (targetHeight !== undefined) {
-      // Jump to a specific selected height
-      setActiveTab('jumping');
-      setCurrentJumperIndex(0);
-      if (!heights.includes(targetHeight)) {
-        setHeights(prev => [...prev, targetHeight].sort((a, b) => a - b));
+    const idx = heights.indexOf(currentHeight);
+    const inc = parseIncrementToMeters(incrementInput) || 0.15;
+    const target = targetHeight !== undefined
+      ? targetHeight
+      : idx < heights.length - 1
+        ? heights[idx + 1]
+        : Number((currentHeight + inc).toFixed(4));
+
+    // Check for athletes entering at this height who skipped 3+ heights
+    const skippedCount = heights.filter(h => h < target).length;
+    if (skippedCount >= 3) {
+      const entering = athletes.filter(a => a.entryHeight && Math.abs(a.entryHeight - target) < 0.0001);
+      if (entering.length > 0) {
+        setRunThroughAthletes(entering);
+        setPendingAdvanceHeight(target);
+        return;
       }
-      setCurrentHeight(targetHeight);
-    } else {
-      doAdvanceHeight();
     }
+
+    doAdvanceHeightTo(target);
   };
 
   const handleCheckedOutDecision = (athlete: Athlete, decision: 'pass' | 'eliminate') => {
@@ -608,12 +642,53 @@ export default function App() {
                         value={manualSchool}
                         onChange={(e) => setManualSchool(e.target.value)}
                       />
+                    </div>
+                    {/* Entry Height (optional) */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-400 font-bold uppercase">Entry Height <span className="font-normal normal-case">— leave blank to start from opening height</span></p>
+                      {unit === 'metric' ? (
+                        <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                          <input
+                            type="number" step="0.01" min="0"
+                            placeholder="e.g. 2.30"
+                            className="flex-1 outline-none text-sm font-bold text-slate-800 bg-transparent"
+                            value={manualEntryHeightFt}
+                            onChange={e => setManualEntryHeightFt(e.target.value)}
+                          />
+                          <span className="text-xs font-bold text-slate-400 shrink-0">m</span>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <div className="flex-1 flex items-center gap-1 bg-white rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                            <input
+                              type="number" step="1" min="0"
+                              placeholder="ft"
+                              className="w-full outline-none text-sm font-bold text-slate-800 bg-transparent"
+                              value={manualEntryHeightFt}
+                              onChange={e => setManualEntryHeightFt(e.target.value)}
+                            />
+                            <span className="text-xs font-bold text-slate-400 shrink-0">ft</span>
+                          </div>
+                          <div className="flex-1 flex items-center gap-1 bg-white rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                            <input
+                              type="number" step="1" min="0" max="11"
+                              placeholder="in"
+                              className="w-full outline-none text-sm font-bold text-slate-800 bg-transparent"
+                              value={manualEntryHeightIn}
+                              onChange={e => setManualEntryHeightIn(e.target.value)}
+                            />
+                            <span className="text-xs font-bold text-slate-400 shrink-0">in</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex justify-end">
                       <button
                         type="submit"
                         disabled={!manualName.trim()}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50"
+                        className="px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-bold"
                       >
-                        <Plus size={20} />
+                        <Plus size={16} /> Add Athlete
                       </button>
                     </div>
                   </form>
@@ -999,6 +1074,121 @@ export default function App() {
         );
       })()}
 
+      {/* Run-Through Alert Dialog */}
+      {runThroughAthletes.length > 0 && pendingAdvanceHeight !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Run-Through Alert</h3>
+                  <p className="text-xs text-slate-500">Bar advancing to {formatHeight(pendingAdvanceHeight)}</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 mb-3">
+                The following athlete{runThroughAthletes.length > 1 ? 's are' : ' is'} entering the competition
+                after passing <span className="font-bold text-slate-800">3+ heights</span> and{' '}
+                {runThroughAthletes.length > 1 ? 'are' : 'is'} eligible for a{' '}
+                <span className="font-bold text-slate-800">run-through warm-up</span>:
+              </p>
+              <ul className="mb-5 space-y-1">
+                {runThroughAthletes.map(a => (
+                  <li key={a.id} className="flex items-center gap-2 bg-amber-50 rounded-xl px-3 py-2">
+                    <span className="text-xs font-bold text-amber-700">
+                      {a.bibNumber ? `#${a.bibNumber}` : '—'}
+                    </span>
+                    <span className="text-sm font-bold text-slate-800">{a.name}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => {
+                  const target = pendingAdvanceHeight;
+                  setRunThroughAthletes([]);
+                  setPendingAdvanceHeight(null);
+                  doAdvanceHeightTo(target);
+                }}
+                className="w-full py-3 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition-colors"
+              >
+                Got it — Advance to {formatHeight(pendingAdvanceHeight)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Entry Height Modal */}
+      {editEntryHeightId && (() => {
+        const athlete = athletes.find(a => a.id === editEntryHeightId);
+        if (!athlete) return null;
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6">
+                <h3 className="text-base font-bold text-slate-900 mb-1">Edit Entry Height</h3>
+                <p className="text-sm text-slate-500 mb-4">{athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}</p>
+                {unit === 'metric' ? (
+                  <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all mb-4">
+                    <input
+                      type="number" step="0.01" min="0"
+                      className="flex-1 outline-none text-xl font-bold text-slate-800 bg-transparent"
+                      value={editEntryHeightFt}
+                      onChange={e => setEditEntryHeightFt(e.target.value)}
+                      autoFocus
+                    />
+                    <span className="text-sm font-bold text-slate-400 shrink-0">m</span>
+                  </div>
+                ) : (
+                  <div className="flex gap-3 mb-4">
+                    <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                      <input
+                        type="number" step="1" min="0"
+                        className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent"
+                        value={editEntryHeightFt}
+                        onChange={e => setEditEntryHeightFt(e.target.value)}
+                        autoFocus
+                      />
+                      <span className="text-sm font-bold text-slate-400 shrink-0">ft</span>
+                    </div>
+                    <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                      <input
+                        type="number" step="1" min="0" max="11"
+                        className="w-full outline-none text-xl font-bold text-slate-800 bg-transparent"
+                        value={editEntryHeightIn}
+                        onChange={e => setEditEntryHeightIn(e.target.value)}
+                      />
+                      <span className="text-sm font-bold text-slate-400 shrink-0">in</span>
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={() => setEditEntryHeightId(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
+                  <button
+                    onClick={() => {
+                      const parsed = editEntryHeightFt.trim()
+                        ? parseInputToMeters(editEntryHeightFt, unit === 'imperial' ? editEntryHeightIn : '0')
+                        : undefined;
+                      setAthletes(prev => prev.map(a =>
+                        a.id === editEntryHeightId
+                          ? { ...a, entryHeight: parsed && parsed > 0 ? parsed : undefined }
+                          : a
+                      ));
+                      setEditEntryHeightId(null);
+                    }}
+                    className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Checked-Out Athlete Modal (height advancement) */}
       {checkedOutQueue.length > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1315,11 +1505,12 @@ export default function App() {
             {/* Tabs */}
             <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full">
               {([
-                { key: 'jumping', label: 'Jumping', color: 'blue', count: athletes.filter(a => a.status !== 'out' && !(a.results[currentHeight] ?? []).includes('O') && !a.checkedOut).length },
+                { key: 'jumping', label: 'Jumping', color: 'blue', count: athletes.filter(a => a.status !== 'out' && !(a.results[currentHeight] ?? []).includes('O') && !a.checkedOut && !(a.entryHeight && a.entryHeight > currentHeight)).length },
                 { key: 'cleared', label: 'Cleared', color: 'emerald', count: athletes.filter(a => (a.results[currentHeight] ?? []).includes('O')).length },
                 { key: 'out', label: 'Out', color: 'rose', count: outAthletes.length },
                 { key: 'checkedOut', label: 'Away', color: 'amber', count: checkedOutAthletes.length },
-              ] as const).map(tab => (
+                { key: 'upcoming', label: 'Upcoming', color: 'violet', count: athletes.filter(a => a.entryHeight && a.entryHeight > currentHeight && a.status !== 'out').length },
+              ] as const).filter(tab => tab.key !== 'upcoming' || tab.count > 0).map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
@@ -1367,6 +1558,20 @@ export default function App() {
                       formatHeight={formatHeight}
                       isCurrentJumper={athlete.id === currentJumperId}
                       isWaiting={isFiveAliveActive && activeTab === 'jumping' && index >= 5}
+                      isUpcoming={activeTab === 'upcoming'}
+                      onEditEntryHeight={activeTab === 'upcoming' ? (id) => {
+                        const a = athletes.find(x => x.id === id);
+                        if (!a) return;
+                        if (unit === 'imperial' && a.entryHeight) {
+                          const totalIn = a.entryHeight / 0.0254;
+                          setEditEntryHeightFt(String(Math.floor(totalIn / 12)));
+                          setEditEntryHeightIn(String(Math.round(totalIn % 12)));
+                        } else {
+                          setEditEntryHeightFt(a.entryHeight ? a.entryHeight.toFixed(2) : '');
+                          setEditEntryHeightIn('0');
+                        }
+                        setEditEntryHeightId(id);
+                      } : undefined}
                     />
                   </React.Fragment>
                 ))}
@@ -1375,6 +1580,7 @@ export default function App() {
                     {activeTab === 'jumping' ? 'All athletes have finished jumping at this height.' :
                      activeTab === 'cleared' ? 'No athletes have cleared this height yet.' :
                      activeTab === 'out' ? 'No athletes are out of the competition yet.' :
+                     activeTab === 'upcoming' ? 'No athletes with future entry heights.' :
                      'No athletes are currently away.'}
                   </div>
                 )}

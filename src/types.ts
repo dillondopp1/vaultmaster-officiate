@@ -10,6 +10,7 @@ export interface Athlete {
   status: 'active' | 'out' | 'finished';
   consecutiveMisses: number;
   checkedOut?: boolean;
+  entryHeight?: number; // height in meters where athlete enters; undefined = competes from opening height
 }
 
 export interface CompetitionState {
