@@ -703,7 +703,7 @@ export default function App() {
 
                 <div>
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Bulk Import</h3>
-                  <CSVImporter onImport={handleImport} />
+                  <CSVImporter onImport={handleImport} unit={unit} />
                 </div>
 
                 {athletes.length > 0 && (
