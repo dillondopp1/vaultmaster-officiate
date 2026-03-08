@@ -37,10 +37,10 @@ export default function App() {
   const [manualBib, setManualBib] = useState('');
   const [manualEntryHeightFt, setManualEntryHeightFt] = useState('');
   const [manualEntryHeightIn, setManualEntryHeightIn] = useState('0');
-  const [unit, setUnit] = useState<Unit>('metric');
-  const [startHeightInput, setStartHeightInput] = useState('2.00');
+  const [unit, setUnit] = useState<Unit>('imperial');
+  const [startHeightInput, setStartHeightInput] = useState('7');
   const [startHeightInchesInput, setStartHeightInchesInput] = useState('0');
-  const [incrementInput, setIncrementInput] = useState('0.10');
+  const [incrementInput, setIncrementInput] = useState('6');
 
   // ─── Live View State ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'jumping' | 'cleared' | 'out' | 'checkedOut' | 'upcoming'>('jumping');
