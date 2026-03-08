@@ -67,6 +67,7 @@ export default function App() {
   // ─── Distance Event State ─────────────────────────────────────────────────
   const [distanceTab, setDistanceTab] = useState<'competing' | 'done' | 'away'>('competing');
   const [markModalAthleteId, setMarkModalAthleteId] = useState<string | null>(null);
+  const [markEditIdx, setMarkEditIdx] = useState<number | null>(null);
   const [markFt, setMarkFt] = useState('');
   const [markIn, setMarkIn] = useState('0');
   const markInRef = useRef<HTMLInputElement>(null);
@@ -220,6 +221,22 @@ export default function App() {
     return consecutive;
   };
 
+  // Consecutive misses accumulated strictly BEFORE upToHeight.
+  // Determines how many attempts an athlete gets at a new height (3 − this value).
+  const priorConsecutiveMisses = (results: Record<number, Attempt[]>, upToHeight: number): number => {
+    const sortedHeights = Object.keys(results).map(Number).sort((a, b) => a - b);
+    let consecutive = 0;
+    for (const h of sortedHeights) {
+      if (h >= upToHeight) break;
+      for (const a of results[h] || []) {
+        if (a === 'X') consecutive++;
+        else if (a === 'O') consecutive = 0;
+        // '-' does not reset
+      }
+    }
+    return consecutive;
+  };
+
   // ─── Computed ───────────────────────────────────────────────────────────────
   // Five Alive is only active when toggle is on AND more than 5 non-eliminated athletes remain
   const isFiveAliveActive = fiveAlive && isStarted && athletes.filter(a => a.status !== 'out').length > 5;
@@ -303,7 +320,8 @@ export default function App() {
       if (a.status === 'out') return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
-      return !att.includes('O') && att.length < 3;
+      const maxAtt = 3 - priorConsecutiveMisses(a.results, currentHeight);
+      return !att.includes('O') && att.length < maxAtt;
     });
     if (eligible.length === 0) return null;
     return eligible[currentJumperIndex % eligible.length];
@@ -328,7 +346,8 @@ export default function App() {
       if (a.status === 'out') return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
-      return !att.includes('O') && att.length < 3;
+      const maxAtt = 3 - priorConsecutiveMisses(a.results, currentHeight);
+      return !att.includes('O') && att.length < maxAtt;
     });
     if (eligible.length === 0) return [];
     const count = Math.min(3, eligible.length);
@@ -555,7 +574,8 @@ export default function App() {
       if (!a || a.status === 'out' || a.checkedOut) return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
-      return !att.includes('O') && att.length < 3;
+      const maxAtt = 3 - priorConsecutiveMisses(a.results, currentHeight);
+      return !att.includes('O') && att.length < maxAtt;
     });
     const eligibleCount = eligibleBefore.length;
 
@@ -591,6 +611,44 @@ export default function App() {
       } else {
         advanceJumper();
       }
+    }
+  };
+
+  // Edit an existing distance attempt in-place (by attempt index)
+  const editAttempt = (athleteId: string, attemptIdx: number, attempt: Attempt, markValue?: number) => {
+    setAthletes(prev => prev.map(a => {
+      if (a.id !== athleteId) return a;
+      const prevAttempts = [...(a.results[0] ?? [])] as Attempt[];
+      prevAttempts[attemptIdx] = attempt;
+      const newMarkValues = { ...(a.markValues ?? {}) };
+      if (attempt === 'O' && markValue !== undefined) {
+        newMarkValues[attemptIdx] = markValue;
+      } else {
+        delete newMarkValues[attemptIdx];
+      }
+      return { ...a, results: { 0: prevAttempts }, markValues: newMarkValues };
+    }));
+  };
+
+  // Open the mark modal in edit mode for a specific attempt slot
+  const openEditModal = (athleteId: string, attemptIdx: number) => {
+    const athlete = athletes.find(a => a.id === athleteId);
+    if (!athlete) return;
+    setMarkModalAthleteId(athleteId);
+    setMarkEditIdx(attemptIdx);
+    const existingMark = athlete.markValues?.[attemptIdx];
+    if (existingMark) {
+      if (unit === 'imperial') {
+        const totalIn = existingMark / 0.0254;
+        setMarkFt(String(Math.floor(totalIn / 12)));
+        setMarkIn(String(Math.round((totalIn % 12) * 4) / 4));
+      } else {
+        setMarkFt(existingMark.toFixed(2));
+        setMarkIn('0');
+      }
+    } else {
+      setMarkFt('');
+      setMarkIn('0');
     }
   };
 
@@ -636,7 +694,8 @@ export default function App() {
       if (a.status === 'out' || a.checkedOut) return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
-      return !att.includes('O') && att.length < 3;
+      const maxAtt = 3 - priorConsecutiveMisses(a.results, currentHeight);
+      return !att.includes('O') && att.length < maxAtt;
     });
     if (notDone.length > 0) {
       setToast(`${notDone.length} athlete${notDone.length > 1 ? 's' : ''} still have attempts remaining at this height.`);
@@ -741,10 +800,14 @@ export default function App() {
     const athlete = athletes.find(a => a.id === markModalAthleteId);
     if (!athlete) return null;
 
-    const closeModal = () => { setMarkModalAthleteId(null); setMarkFt(''); setMarkIn('0'); };
+    const isEditing = markEditIdx !== null;
+    const closeModal = () => { setMarkModalAthleteId(null); setMarkFt(''); setMarkIn('0'); setMarkEditIdx(null); };
     const saveAndClose = () => {
       const meters = parseMarkToMeters(markFt, markIn);
-      if (meters > 0) recordAttempt(markModalAthleteId, 'O', meters);
+      if (meters > 0) {
+        if (isEditing) editAttempt(markModalAthleteId, markEditIdx, 'O', meters);
+        else recordAttempt(markModalAthleteId, 'O', meters);
+      }
       closeModal();
     };
 
@@ -752,7 +815,7 @@ export default function App() {
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
           <div className="p-5 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-900">Record Mark</h3>
+            <h3 className="text-base font-bold text-slate-900">{isEditing ? 'Edit Mark' : 'Record Mark'}</h3>
             <p className="text-sm text-slate-500">{athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}</p>
           </div>
           <div className="p-5">
@@ -804,10 +867,14 @@ export default function App() {
               disabled={parseMarkToMeters(markFt, markIn) <= 0}
               className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-all"
             >
-              Save Mark
+              {isEditing ? 'Update Mark' : 'Save Mark'}
             </button>
             <button
-              onClick={() => { recordAttempt(markModalAthleteId, 'X'); closeModal(); }}
+              onClick={() => {
+                if (isEditing) editAttempt(markModalAthleteId, markEditIdx, 'X');
+                else recordAttempt(markModalAthleteId, 'X');
+                closeModal();
+              }}
               className="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all"
             >
               Scratch (No Mark)
@@ -1667,15 +1734,20 @@ export default function App() {
                               </div>
                               {athlete.school && <p className="text-xs uppercase tracking-wider text-blue-500 mt-0.5">{athlete.school}</p>}
                             </div>
-                            {/* Attempt slots showing marks */}
+                            {/* Attempt slots showing marks — tap to edit */}
                             <div className="flex gap-1.5 items-center shrink-0">
                               {[0, 1, 2].map(i => (
-                                <div key={i} className={cn(
-                                  'min-w-[2.5rem] h-10 rounded-lg flex items-center justify-center text-xs font-bold border px-1',
-                                  attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
-                                  attempts[i] === 'X' ? 'bg-rose-100 text-rose-600 border-rose-200' :
-                                  'bg-white text-slate-300 border-blue-200',
-                                )}>
+                                <div
+                                  key={i}
+                                  onClick={attempts[i] ? () => openEditModal(athlete.id, i) : undefined}
+                                  className={cn(
+                                    'min-w-[2.5rem] h-10 rounded-lg flex items-center justify-center text-xs font-bold border px-1',
+                                    attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
+                                    attempts[i] === 'X' ? 'bg-rose-100 text-rose-600 border-rose-200' :
+                                    'bg-white text-slate-300 border-blue-200',
+                                    attempts[i] ? 'cursor-pointer hover:opacity-70 active:scale-90 transition-all' : '',
+                                  )}
+                                >
                                   {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
                                 </div>
                               ))}
@@ -1721,15 +1793,20 @@ export default function App() {
                             </p>
                             {athlete.school && <p className="text-[10px] uppercase tracking-wider text-slate-400 leading-snug">{athlete.school}</p>}
                           </div>
-                          {/* 3 mark slots */}
+                          {/* 3 mark slots — tap to edit */}
                           <div className="flex gap-1 shrink-0">
                             {[0, 1, 2].map(i => (
-                              <div key={i} className={cn(
-                                'min-w-[2rem] h-7 rounded flex items-center justify-center text-[10px] font-bold border px-1',
-                                attempts[i] === 'O' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                                attempts[i] === 'X' ? 'bg-rose-50 text-rose-400 border-rose-100' :
-                                'bg-slate-100 text-slate-300 border-slate-200',
-                              )}>
+                              <div
+                                key={i}
+                                onClick={attempts[i] ? () => openEditModal(athlete.id, i) : undefined}
+                                className={cn(
+                                  'min-w-[2rem] h-7 rounded flex items-center justify-center text-[10px] font-bold border px-1',
+                                  attempts[i] === 'O' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                  attempts[i] === 'X' ? 'bg-rose-50 text-rose-400 border-rose-100' :
+                                  'bg-slate-100 text-slate-300 border-slate-200',
+                                  attempts[i] ? 'cursor-pointer hover:opacity-70 active:scale-90 transition-all' : '',
+                                )}
+                              >
                                 {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
                               </div>
                             ))}
@@ -2332,6 +2409,7 @@ export default function App() {
                       isCurrentJumper={athlete.id === currentJumperId}
                       isWaiting={isFiveAliveActive && activeTab === 'jumping' && index >= 5}
                       isUpcoming={activeTab === 'upcoming'}
+                      maxAttempts={3 - priorConsecutiveMisses(athlete.results, currentHeight)}
                       onEditEntryHeight={activeTab === 'upcoming' ? (id) => {
                         const a = athletes.find(x => x.id === id);
                         if (!a) return;

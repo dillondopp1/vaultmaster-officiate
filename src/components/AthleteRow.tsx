@@ -15,6 +15,7 @@ interface Props {
   isWaiting?: boolean;
   isUpcoming?: boolean;
   onEditEntryHeight?: (athleteId: string) => void;
+  maxAttempts?: number; // carry-over rule: may be < 3 when athlete has prior consecutive misses
 }
 
 export const AthleteRow: React.FC<Props> = ({
@@ -29,6 +30,7 @@ export const AthleteRow: React.FC<Props> = ({
   isWaiting,
   isUpcoming,
   onEditEntryHeight,
+  maxAttempts = 3,
 }) => {
   const isOut = athlete.status === 'out';
   const isFinished = athlete.status === 'finished';
@@ -52,7 +54,7 @@ export const AthleteRow: React.FC<Props> = ({
   const displayHeight = isOutTab && outHeight !== null ? outHeight : currentHeight;
   const attempts = athlete.results[displayHeight] || [];
   const canAttempt = !isOut && !isFinished && !athlete.checkedOut && !isWaiting
-    && attempts.length < 3 && !attempts.includes('O');
+    && attempts.length < maxAttempts && !attempts.includes('O');
 
   // ── Current jumper: full card with large buttons ──────────────────────────
   if (isCurrentJumper && !isOut) {
@@ -89,7 +91,7 @@ export const AthleteRow: React.FC<Props> = ({
             </div>
           </div>
           <div className="flex gap-1.5 items-center shrink-0">
-            {[0, 1, 2].map((i) => {
+            {Array.from({ length: maxAttempts }, (_, i) => {
               const isLastFilled = attempts.length > 0 && i === attempts.length - 1;
               return (
                 <div
@@ -234,7 +236,7 @@ export const AthleteRow: React.FC<Props> = ({
 
         {/* Attempt boxes — compact */}
         <div className="flex gap-1 shrink-0">
-          {[0, 1, 2].map((i) => {
+          {Array.from({ length: maxAttempts }, (_, i) => {
             const isLastFilled = attempts.length > 0 && i === attempts.length - 1;
             return (
               <div
