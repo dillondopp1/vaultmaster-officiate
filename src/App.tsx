@@ -14,6 +14,7 @@ import ljIcon from './assets/icons/long-jump.svg';
 import spIcon from './assets/icons/shot-put.svg';
 import dtIcon from './assets/icons/discus.svg';
 import htIcon from './assets/icons/hammer.svg';
+import jtIcon from './assets/icons/javelin.svg';
 import { cn } from './lib/utils';
 
 // ─── Event Meta ──────────────────────────────────────────────────────────────
@@ -24,7 +25,7 @@ const EVENT_META: Record<EventType, { label: string; description: string; action
   'triple-jump':  { label: 'Triple Jump',  description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘', svg: ljIcon },
   'shot-put':     { label: 'Shot Put',     description: '3 attempts · distance',      action: 'Throwing', icon: '⚪', svg: spIcon },
   'discus':       { label: 'Discus',       description: '3 attempts · distance',      action: 'Throwing', icon: '🥏', svg: dtIcon },
-  'javelin':      { label: 'Javelin',      description: '3 attempts · distance',      action: 'Throwing', icon: '🏹' },
+  'javelin':      { label: 'Javelin',      description: '3 attempts · distance',      action: 'Throwing', icon: '🏹', svg: jtIcon },
   'hammer':       { label: 'Hammer Throw', description: '3 attempts · distance',      action: 'Throwing', icon: '🔨', svg: htIcon },
 };
 
