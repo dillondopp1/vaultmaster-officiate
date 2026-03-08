@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CSVImporter } from './components/CSVImporter';
 import { AthleteRow } from './components/AthleteRow';
 import { Athlete, Attempt, Unit, EventType, HEIGHT_EVENTS } from './types';
@@ -62,6 +62,7 @@ export default function App() {
   const [markModalAthleteId, setMarkModalAthleteId] = useState<string | null>(null);
   const [markFt, setMarkFt] = useState('');
   const [markIn, setMarkIn] = useState('0');
+  const markInRef = useRef<HTMLInputElement>(null);
 
   // ─── Flights State ────────────────────────────────────────────────────────
   const [flightSize, setFlightSize] = useState(8);
@@ -753,13 +754,23 @@ export default function App() {
                   <input
                     autoFocus type="number" step="1" min="0"
                     className="w-full outline-none text-2xl font-bold text-slate-800 bg-transparent"
-                    value={markFt} onChange={e => setMarkFt(e.target.value)}
+                    value={markFt}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setMarkFt(val);
+                      const threshold = selectedEvent && ['discus', 'javelin', 'hammer'].includes(selectedEvent) ? 3 : 2;
+                      if (val.length >= threshold) {
+                        markInRef.current?.focus();
+                        markInRef.current?.select();
+                      }
+                    }}
                     placeholder="0"
                   />
                   <span className="text-sm font-bold text-slate-400 shrink-0">ft</span>
                 </div>
                 <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
                   <input
+                    ref={markInRef}
                     type="number" step="0.25" min="0" max="11.75"
                     className="w-full outline-none text-2xl font-bold text-slate-800 bg-transparent"
                     value={markIn} onChange={e => setMarkIn(e.target.value)}
