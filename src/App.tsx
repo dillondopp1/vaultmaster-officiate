@@ -8,18 +8,24 @@ import {
   LogOut, LogIn, Ruler, Pencil, AlertTriangle,
 } from 'lucide-react';
 import logoSvg from './assets/logo.svg';
+import pvIcon from './assets/icons/pole-vault.svg';
+import hjIcon from './assets/icons/high-jump.svg';
+import ljIcon from './assets/icons/long-jump.svg';
+import spIcon from './assets/icons/shot-put.svg';
+import dtIcon from './assets/icons/discus.svg';
+import htIcon from './assets/icons/hammer.svg';
 import { cn } from './lib/utils';
 
 // ─── Event Meta ──────────────────────────────────────────────────────────────
-const EVENT_META: Record<EventType, { label: string; description: string; action: string; icon: string }> = {
-  'pole-vault':   { label: 'Pole Vault',   description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏋️' },
-  'high-jump':    { label: 'High Jump',    description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏃' },
-  'long-jump':    { label: 'Long Jump',    description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘' },
-  'triple-jump':  { label: 'Triple Jump',  description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘' },
-  'shot-put':     { label: 'Shot Put',     description: '3 attempts · distance',      action: 'Throwing', icon: '⚪' },
-  'discus':       { label: 'Discus',       description: '3 attempts · distance',      action: 'Throwing', icon: '🥏' },
+const EVENT_META: Record<EventType, { label: string; description: string; action: string; icon: string; svg?: string }> = {
+  'pole-vault':   { label: 'Pole Vault',   description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏋️', svg: pvIcon },
+  'high-jump':    { label: 'High Jump',    description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏃', svg: hjIcon },
+  'long-jump':    { label: 'Long Jump',    description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘', svg: ljIcon },
+  'triple-jump':  { label: 'Triple Jump',  description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘', svg: ljIcon },
+  'shot-put':     { label: 'Shot Put',     description: '3 attempts · distance',      action: 'Throwing', icon: '⚪', svg: spIcon },
+  'discus':       { label: 'Discus',       description: '3 attempts · distance',      action: 'Throwing', icon: '🥏', svg: dtIcon },
   'javelin':      { label: 'Javelin',      description: '3 attempts · distance',      action: 'Throwing', icon: '🏹' },
-  'hammer':       { label: 'Hammer Throw', description: '3 attempts · distance',      action: 'Throwing', icon: '🔨' },
+  'hammer':       { label: 'Hammer Throw', description: '3 attempts · distance',      action: 'Throwing', icon: '🔨', svg: htIcon },
 };
 
 // ─── Placement helpers ───────────────────────────────────────────────────────
@@ -939,7 +945,9 @@ export default function App() {
                       onClick={() => setSelectedEvent(evt)}
                       className="flex flex-col items-start gap-2 p-4 bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 active:scale-[0.97] transition-all text-left shadow-sm"
                     >
-                      <span className="text-2xl">{meta.icon}</span>
+                      {meta.svg
+                        ? <img src={meta.svg} alt={meta.label} className="h-9 w-auto" />
+                        : <span className="text-2xl">{meta.icon}</span>}
                       <div>
                         <p className="font-bold text-slate-900 text-sm">{meta.label}</p>
                         <p className="text-[10px] text-slate-400 mt-0.5">{meta.description}</p>
@@ -961,7 +969,9 @@ export default function App() {
                       onClick={() => setSelectedEvent(evt)}
                       className="flex flex-col items-start gap-2 p-3 bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 active:scale-[0.97] transition-all text-left shadow-sm"
                     >
-                      <span className="text-xl">{meta.icon}</span>
+                      {meta.svg
+                        ? <img src={meta.svg} alt={meta.label} className="h-7 w-auto" />
+                        : <span className="text-xl">{meta.icon}</span>}
                       <div>
                         <p className="font-bold text-slate-800 text-xs leading-tight">{meta.label}</p>
                         <p className="text-[9px] text-slate-400 mt-0.5">{meta.description}</p>
