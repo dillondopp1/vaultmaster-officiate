@@ -73,6 +73,7 @@ export default function App() {
 
   // ─── Flights State ────────────────────────────────────────────────────────
   const [flightSize, setFlightSize] = useState(8);
+  const [flightSizeStr, setFlightSizeStr] = useState('8');
   const [flights, setFlights] = useState<string[][]>([]);
   const [currentFlightIdx, setCurrentFlightIdx] = useState(0);
   const [currentRound, setCurrentRound] = useState(1);
@@ -149,7 +150,7 @@ export default function App() {
       if (p.flights) setFlights(p.flights);
       if (p.currentFlightIdx !== undefined) setCurrentFlightIdx(p.currentFlightIdx);
       if (p.currentRound !== undefined) setCurrentRound(p.currentRound);
-      if (p.flightSize !== undefined) setFlightSize(p.flightSize);
+      if (p.flightSize !== undefined) { setFlightSize(p.flightSize); setFlightSizeStr(String(p.flightSize)); }
     }
     const savedHistory = localStorage.getItem('vault_master_history');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
@@ -1363,8 +1364,18 @@ export default function App() {
                 <input
                   type="number"
                   min="1"
-                  value={flightSize}
-                  onChange={e => setFlightSize(Math.max(1, parseInt(e.target.value) || 8))}
+                  value={flightSizeStr}
+                  onChange={e => {
+                    setFlightSizeStr(e.target.value);
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val) && val >= 1) setFlightSize(val);
+                  }}
+                  onBlur={() => {
+                    const val = parseInt(flightSizeStr);
+                    const clamped = isNaN(val) || val < 1 ? 1 : val;
+                    setFlightSize(clamped);
+                    setFlightSizeStr(String(clamped));
+                  }}
                   className="w-24 px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono text-center"
                 />
                 <p className="text-xs text-slate-400 mt-2">
