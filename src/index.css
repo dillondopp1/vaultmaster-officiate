@@ -44,3 +44,20 @@ body {
 .btn-miss { @apply bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200; }
 .btn-pass { @apply bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200; }
 
+/* ── Event tile entrance animation ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tile-animate {
+  opacity: 0;
+  animation: fadeInUp 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+

@@ -15,18 +15,26 @@ import spIcon from './assets/icons/shot-put.svg';
 import dtIcon from './assets/icons/discus.svg';
 import htIcon from './assets/icons/hammer.svg';
 import jtIcon from './assets/icons/javelin.svg';
+import pvTile from './assets/tiles/PV.png';
+import hjTile from './assets/tiles/HJ.png';
+import ljTile from './assets/tiles/LJ.png';
+import tjTile from './assets/tiles/TJ.png';
+import spTile from './assets/tiles/SP.png';
+import dtTile from './assets/tiles/Discus.png';
+import htTile from './assets/tiles/HT.png';
+import jtTile from './assets/tiles/javelin.png';
 import { cn } from './lib/utils';
 
 // ─── Event Meta ──────────────────────────────────────────────────────────────
-const EVENT_META: Record<EventType, { label: string; description: string; action: string; icon: string; svg?: string }> = {
-  'pole-vault':   { label: 'Pole Vault',   description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏋️', svg: pvIcon },
-  'high-jump':    { label: 'High Jump',    description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏃', svg: hjIcon },
-  'long-jump':    { label: 'Long Jump',    description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘', svg: ljIcon },
-  'triple-jump':  { label: 'Triple Jump',  description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘', svg: ljIcon },
-  'shot-put':     { label: 'Shot Put',     description: '3 attempts · distance',      action: 'Throwing', icon: '⚪', svg: spIcon },
-  'discus':       { label: 'Discus',       description: '3 attempts · distance',      action: 'Throwing', icon: '🥏', svg: dtIcon },
-  'javelin':      { label: 'Javelin',      description: '3 attempts · distance',      action: 'Throwing', icon: '🏹', svg: jtIcon },
-  'hammer':       { label: 'Hammer Throw', description: '3 attempts · distance',      action: 'Throwing', icon: '🔨', svg: htIcon },
+const EVENT_META: Record<EventType, { label: string; description: string; action: string; icon: string; svg?: string; tile?: string }> = {
+  'pole-vault':   { label: 'Pole Vault',   description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏋️', svg: pvIcon, tile: pvTile },
+  'high-jump':    { label: 'High Jump',    description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏃', svg: hjIcon, tile: hjTile },
+  'long-jump':    { label: 'Long Jump',    description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘', svg: ljIcon, tile: ljTile },
+  'triple-jump':  { label: 'Triple Jump',  description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘', svg: ljIcon, tile: tjTile },
+  'shot-put':     { label: 'Shot Put',     description: '3 attempts · distance',      action: 'Throwing', icon: '⚪', svg: spIcon, tile: spTile },
+  'discus':       { label: 'Discus',       description: '3 attempts · distance',      action: 'Throwing', icon: '🥏', svg: dtIcon, tile: dtTile },
+  'javelin':      { label: 'Javelin',      description: '3 attempts · distance',      action: 'Throwing', icon: '🏹', svg: jtIcon, tile: jtTile },
+  'hammer':       { label: 'Hammer Throw', description: '3 attempts · distance',      action: 'Throwing', icon: '🔨', svg: htIcon, tile: htTile },
 };
 
 // ─── Placement helpers ───────────────────────────────────────────────────────
@@ -951,10 +959,47 @@ export default function App() {
   if (!selectedEvent) {
     const heightEvents: EventType[] = ['pole-vault', 'high-jump'];
     const distanceEvents: EventType[] = ['long-jump', 'triple-jump', 'shot-put', 'discus', 'javelin', 'hammer'];
+
+    const renderTile = (evt: EventType, index: number, size: 'large' | 'small') => {
+      const meta = EVENT_META[evt];
+      return (
+        <button
+          key={evt}
+          onClick={() => setSelectedEvent(evt)}
+          className="tile-animate group relative overflow-hidden rounded-2xl shadow-md border border-blue-100/80 bg-gradient-to-br from-white to-blue-50 active:scale-[0.96] transition-all duration-300 hover:shadow-xl hover:shadow-blue-200/60 hover:-translate-y-0.5 text-left"
+          style={{ animationDelay: `${index * 65}ms` }}
+        >
+          {/* Top accent bar */}
+          <div className="h-[3px] w-full bg-gradient-to-r from-[#12078C] via-blue-500 to-blue-400" />
+          {/* PNG tile image */}
+          <div className={`flex items-center justify-center w-full overflow-hidden ${size === 'large' ? 'h-36 px-3 py-4' : 'h-24 px-2 py-3'}`}>
+            {meta.tile ? (
+              <img
+                src={meta.tile}
+                alt={meta.label}
+                className="w-full h-full object-contain"
+                style={{ mixBlendMode: 'multiply' }}
+              />
+            ) : meta.svg ? (
+              <img src={meta.svg} alt={meta.label} className={size === 'large' ? 'h-10 w-auto' : 'h-7 w-auto'} />
+            ) : (
+              <span className={size === 'large' ? 'text-3xl' : 'text-2xl'}>{meta.icon}</span>
+            )}
+          </div>
+          {/* Bottom description */}
+          <div className="px-3 pb-3">
+            <p className="text-[10px] text-slate-400 font-medium">{meta.description}</p>
+          </div>
+          {/* Hover shimmer */}
+          <div className="absolute inset-0 bg-blue-400/0 group-hover:bg-blue-400/[0.04] transition-colors duration-300 pointer-events-none rounded-2xl" />
+        </button>
+      );
+    };
+
     return (
-      <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+      <div className="min-h-screen bg-gradient-to-b from-slate-100 to-blue-50/40 p-4 md:p-8">
         <div className="max-w-lg mx-auto">
-          <header className="mb-8 text-center pt-2">
+          <header className="mb-8 text-center pt-2 tile-animate" style={{ animationDelay: '0ms' }}>
             <img src={logoSvg} alt="Teton Vault" className="w-20 h-20 mx-auto mb-3 drop-shadow-lg" />
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Teton Vault Officiate</h1>
             <p className="text-slate-500 mt-1 text-sm">Select your event to get started</p>
@@ -964,48 +1009,13 @@ export default function App() {
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Bar Height Events</p>
               <div className="grid grid-cols-2 gap-3">
-                {heightEvents.map(evt => {
-                  const meta = EVENT_META[evt];
-                  return (
-                    <button
-                      key={evt}
-                      onClick={() => setSelectedEvent(evt)}
-                      className="flex flex-col items-start gap-2 p-4 bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 active:scale-[0.97] transition-all text-left shadow-sm"
-                    >
-                      {meta.svg
-                        ? <img src={meta.svg} alt={meta.label} className="h-9 w-auto" />
-                        : <span className="text-2xl">{meta.icon}</span>}
-                      <div>
-                        <p className="font-bold text-slate-900 text-sm">{meta.label}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">{meta.description}</p>
-                      </div>
-                    </button>
-                  );
-                })}
+                {heightEvents.map((evt, i) => renderTile(evt, i + 1, 'large'))}
               </div>
             </div>
-
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Distance &amp; Throwing Events</p>
               <div className="grid grid-cols-3 gap-3">
-                {distanceEvents.map(evt => {
-                  const meta = EVENT_META[evt];
-                  return (
-                    <button
-                      key={evt}
-                      onClick={() => setSelectedEvent(evt)}
-                      className="flex flex-col items-start gap-2 p-3 bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 active:scale-[0.97] transition-all text-left shadow-sm"
-                    >
-                      {meta.svg
-                        ? <img src={meta.svg} alt={meta.label} className="h-7 w-auto" />
-                        : <span className="text-xl">{meta.icon}</span>}
-                      <div>
-                        <p className="font-bold text-slate-800 text-xs leading-tight">{meta.label}</p>
-                        <p className="text-[9px] text-slate-400 mt-0.5">{meta.description}</p>
-                      </div>
-                    </button>
-                  );
-                })}
+                {distanceEvents.map((evt, i) => renderTile(evt, i + 3, 'small'))}
               </div>
             </div>
           </div>
