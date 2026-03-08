@@ -63,6 +63,12 @@ export default function App() {
   const [markFt, setMarkFt] = useState('');
   const [markIn, setMarkIn] = useState('0');
 
+  // ─── Flights State ────────────────────────────────────────────────────────
+  const [flightSize, setFlightSize] = useState(8);
+  const [flights, setFlights] = useState<string[][]>([]);
+  const [currentFlightIdx, setCurrentFlightIdx] = useState(0);
+  const [currentRound, setCurrentRound] = useState(1);
+
   // ─── Live View State ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'jumping' | 'cleared' | 'out' | 'checkedOut' | 'upcoming'>('jumping');
   const [setupView, setSetupView] = useState<'main' | 'roster'>('main');
@@ -132,6 +138,10 @@ export default function App() {
       if (p.jumpOrderIds) setJumpOrderIds(p.jumpOrderIds);
       if (p.fiveAlive !== undefined) setFiveAlive(p.fiveAlive);
       if (p.selectedEvent) setSelectedEvent(p.selectedEvent);
+      if (p.flights) setFlights(p.flights);
+      if (p.currentFlightIdx !== undefined) setCurrentFlightIdx(p.currentFlightIdx);
+      if (p.currentRound !== undefined) setCurrentRound(p.currentRound);
+      if (p.flightSize !== undefined) setFlightSize(p.flightSize);
     }
     const savedHistory = localStorage.getItem('vault_master_history');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
@@ -142,9 +152,10 @@ export default function App() {
       localStorage.setItem('vault_master_state', JSON.stringify({
         athletes, currentHeight, heights, isStarted, unit,
         incrementInput, startTime, jumpOrderIds, fiveAlive, selectedEvent,
+        flights, currentFlightIdx, currentRound, flightSize,
       }));
     }
-  }, [athletes, currentHeight, heights, isStarted, unit, incrementInput, startTime, jumpOrderIds, fiveAlive]);
+  }, [athletes, currentHeight, heights, isStarted, unit, incrementInput, startTime, jumpOrderIds, fiveAlive, flights, currentFlightIdx, currentRound, flightSize]);
 
   // ─── Derived ────────────────────────────────────────────────────────────────
   const isHeightEvent = selectedEvent ? HEIGHT_EVENTS.includes(selectedEvent) : true;
@@ -266,12 +277,20 @@ export default function App() {
   }, [selectedHistoryItem]);
 
   const currentJumperId = useMemo(() => {
+    if (!isHeightEvent) {
+      // Flight-based: first eligible athlete in current flight who hasn't taken currentRound attempt
+      const currentFlightIds = flights[currentFlightIdx] ?? [];
+      for (const id of currentFlightIds) {
+        const a = athletes.find(x => x.id === id);
+        if (a && !a.checkedOut && (a.results[0]?.length ?? 0) < currentRound) {
+          return id;
+        }
+      }
+      return null;
+    }
     const eligible = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
       if (!a || a.checkedOut) return false;
-      if (!isHeightEvent) {
-        return (a.results[0]?.length ?? 0) < 3;
-      }
       if (a.status === 'out') return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
@@ -279,15 +298,24 @@ export default function App() {
     });
     if (eligible.length === 0) return null;
     return eligible[currentJumperIndex % eligible.length];
-  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex, isHeightEvent]);
+  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex, isHeightEvent, flights, currentFlightIdx, currentRound]);
 
   const upcomingJumpers = useMemo(() => {
+    if (!isHeightEvent) {
+      // Flight-based: next 3 eligible athletes in current flight for currentRound
+      const currentFlightIds = flights[currentFlightIdx] ?? [];
+      const eligible = currentFlightIds.filter(id => {
+        const a = athletes.find(x => x.id === id);
+        return a && !a.checkedOut && (a.results[0]?.length ?? 0) < currentRound;
+      });
+      const count = Math.min(3, eligible.length);
+      return Array.from({ length: count }, (_, i) =>
+        athletes.find(a => a.id === eligible[i]) ?? null
+      ).filter((a): a is Athlete => a !== null);
+    }
     const eligible = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
       if (!a || a.checkedOut) return false;
-      if (!isHeightEvent) {
-        return (a.results[0]?.length ?? 0) < 3;
-      }
       if (a.status === 'out') return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
@@ -299,7 +327,7 @@ export default function App() {
       const id = eligible[(currentJumperIndex + offset) % eligible.length];
       return athletes.find(a => a.id === id) ?? null;
     }).filter((a): a is Athlete => a !== null);
-  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex, isHeightEvent]);
+  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex, isHeightEvent, flights, currentFlightIdx, currentRound]);
 
   const filteredAthletes = useMemo(() => {
     const filtered = athletes.filter(athlete => {
@@ -341,6 +369,28 @@ export default function App() {
       return a.name.localeCompare(b.name);
     });
   }, [athletes, activeTab, currentHeight, jumpOrderIds, currentJumperId]);
+
+  // ─── Auto-advance round/flight for distance events ───────────────────────────
+  useEffect(() => {
+    if (!isStarted || isHeightEvent || flights.length === 0) return;
+    const currentFlightIds = flights[currentFlightIdx] ?? [];
+    if (currentFlightIds.length === 0) return;
+    // Guard: only advance after at least one athlete has recorded for currentRound
+    const hasProgress = currentFlightIds.some(id => {
+      const a = athletes.find(x => x.id === id);
+      return a && (a.results[0]?.length ?? 0) >= currentRound;
+    });
+    if (!hasProgress) return;
+    // Still someone left to go — don't advance
+    if (currentJumperId !== null) return;
+    // All eligible in current flight done with this round — advance
+    if (currentRound < 3) {
+      setCurrentRound(r => r + 1);
+    } else if (currentFlightIdx < flights.length - 1) {
+      setCurrentFlightIdx(f => f + 1);
+      setCurrentRound(1);
+    }
+  }, [currentJumperId, isStarted, isHeightEvent, flights, currentFlightIdx, currentRound, athletes]);
 
   // ─── Setup Actions ───────────────────────────────────────────────────────────
   const handleImport = (importedAthletes: Athlete[]) => {
@@ -415,6 +465,17 @@ export default function App() {
       } else {
         setCurrentHeight(heights[0]);
       }
+    } else {
+      // Distance event: split athletes into flights
+      const orderedIds = ordered.map(a => a.id);
+      const size = Math.max(1, flightSize);
+      const flightGroups: string[][] = [];
+      for (let i = 0; i < orderedIds.length; i += size) {
+        flightGroups.push(orderedIds.slice(i, i + size));
+      }
+      setFlights(flightGroups);
+      setCurrentFlightIdx(0);
+      setCurrentRound(1);
     }
   };
 
@@ -446,6 +507,7 @@ export default function App() {
       localStorage.removeItem('vault_master_state');
       setAthletes([]); setHeights([]); setCurrentHeight(0); setIsStarted(false);
       setStartTime(null); setJumpOrderIds([]); setCurrentJumperIndex(0);
+      setFlights([]); setCurrentFlightIdx(0); setCurrentRound(1);
       setModal({ type: 'none', title: '', message: '' });
       setToast(`Meet "${nameToUse}" saved!`);
     } catch {
@@ -463,26 +525,17 @@ export default function App() {
   // ─── Competition Actions ─────────────────────────────────────────────────────
   const recordAttempt = (athleteId: string, attempt: Attempt, markValue?: number) => {
     if (!isHeightEvent) {
-      // ── Distance event ──────────────────────────────────────────────────────
-      const eligibleBefore = jumpOrderIds.filter(id => {
-        const a = athletes.find(x => x.id === id);
-        return a && !a.checkedOut && (a.results[0]?.length ?? 0) < 3;
-      });
-      const eligibleCount = eligibleBefore.length;
-
+      // ── Distance event (flight-based) ────────────────────────────────────────
       setAthletes(prev => prev.map(a => {
         if (a.id !== athleteId) return a;
         const prevAttempts = a.results[0] ?? [];
-        const newAttempts = [...prevAttempts, attempt];
-        const attemptIdx = prevAttempts.length; // index of the new attempt
+        const attemptIdx = prevAttempts.length;
         const newMarkValues = attempt === 'O' && markValue !== undefined
           ? { ...(a.markValues ?? {}), [attemptIdx]: markValue }
           : a.markValues;
-        return { ...a, results: { 0: newAttempts }, markValues: newMarkValues };
+        return { ...a, results: { 0: [...prevAttempts, attempt] }, markValues: newMarkValues };
       }));
-
-      // Always advance to next athlete for distance events
-      if (eligibleCount > 1) advanceJumper();
+      // No advanceJumper() — flight-based currentJumperId auto-rotates
       return;
     }
 
@@ -646,6 +699,7 @@ export default function App() {
   const confirmReset = () => {
     setAthletes([]); setHeights([]); setCurrentHeight(0); setIsStarted(false);
     setStartTime(null); setJumpOrderIds([]); setCurrentJumperIndex(0);
+    setFlights([]); setCurrentFlightIdx(0); setCurrentRound(1);
     setSelectedEvent(null);
     localStorage.removeItem('vault_master_state');
     setModal({ type: 'none', title: '', message: '' });
@@ -1046,6 +1100,17 @@ export default function App() {
             )}
           </div>
 
+          {/* Start Meet sticky footer */}
+          <div className="px-3 py-3 border-t border-slate-100 bg-white shrink-0">
+            <button
+              onClick={startCompetition}
+              disabled={athletes.length === 0}
+              className="w-full py-3.5 bg-blue-600 text-white rounded-2xl font-bold text-base shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              Start Meet <ChevronRight size={18} />
+            </button>
+          </div>
+
         </div>
         {renderEntryHeightModal()}
         </>
@@ -1263,6 +1328,31 @@ export default function App() {
 
             </div>}
 
+            {/* Distance event settings */}
+            {!isHeightEvent && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center">
+                    <Users size={18} />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Flight Settings</h2>
+                </div>
+                <label className="text-sm font-bold text-slate-700 block mb-2">Athletes per Flight</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={flightSize}
+                  onChange={e => setFlightSize(Math.max(1, parseInt(e.target.value) || 8))}
+                  className="w-24 px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono text-center"
+                />
+                <p className="text-xs text-slate-400 mt-2">
+                  {athletes.length > 0
+                    ? `${Math.ceil(athletes.length / flightSize)} flight${Math.ceil(athletes.length / flightSize) !== 1 ? 's' : ''} of up to ${flightSize} athletes`
+                    : 'Splits athletes into sequential groups of this size'}
+                </p>
+              </div>
+            )}
+
             <button
               onClick={startCompetition}
               disabled={athletes.length === 0}
@@ -1360,12 +1450,21 @@ export default function App() {
   if (!isHeightEvent) {
     const meta = EVENT_META[selectedEvent!];
     const allDone = athletes.length > 0 && athletes.every(a => (a.results[0]?.length ?? 0) >= 3);
-    const distCompeting = athletes.filter(a => !a.checkedOut && (a.results[0]?.length ?? 0) < 3);
+    const currentFlightSet = new Set(flights[currentFlightIdx] ?? []);
+    // "Competing" = current flight athletes who haven't taken their currentRound attempt yet
+    const distCompeting = athletes.filter(a =>
+      currentFlightSet.has(a.id) && !a.checkedOut && (a.results[0]?.length ?? 0) < currentRound
+    );
+    // "Waiting" = current flight athletes who have taken currentRound but aren't done yet (round in progress)
+    const distWaiting = athletes.filter(a =>
+      currentFlightSet.has(a.id) && !a.checkedOut &&
+      (a.results[0]?.length ?? 0) >= currentRound && (a.results[0]?.length ?? 0) < 3
+    );
     const distDone = athletes.filter(a => (a.results[0]?.length ?? 0) >= 3);
     const distAway = athletes.filter(a => !!a.checkedOut && (a.results[0]?.length ?? 0) < 3);
 
     const distFilteredAthletes = (() => {
-      if (distanceTab === 'competing') return distCompeting;
+      if (distanceTab === 'competing') return [...distCompeting, ...distWaiting];
       if (distanceTab === 'done') return distDone;
       return distAway;
     })();
@@ -1425,6 +1524,16 @@ export default function App() {
                 <div className="flex items-center gap-1.5">
                   <Clock size={10} className="text-slate-400" />
                   <span className="text-[10px] text-slate-400 font-mono font-bold">{elapsedTime}</span>
+                  {flights.length > 1 && (
+                    <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                      Flight {currentFlightIdx + 1}/{flights.length} · Rd {currentRound}/3
+                    </span>
+                  )}
+                  {flights.length === 1 && (
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                      Round {currentRound}/3
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1484,7 +1593,7 @@ export default function App() {
               {/* Tabs */}
               <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full">
                 {([
-                  { key: 'competing' as const, label: 'Competing', count: distCompeting.length, color: 'blue' },
+                  { key: 'competing' as const, label: 'Competing', count: distCompeting.length + distWaiting.length, color: 'blue' },
                   { key: 'done' as const, label: 'Done', count: distDone.length, color: 'emerald' },
                   { key: 'away' as const, label: 'Away', count: distAway.length, color: 'amber' },
                 ]).map(tab => (
