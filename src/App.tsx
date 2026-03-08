@@ -1,14 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CSVImporter } from './components/CSVImporter';
 import { AthleteRow } from './components/AthleteRow';
-import { Athlete, Attempt, Unit } from './types';
+import { Athlete, Attempt, Unit, EventType, HEIGHT_EVENTS } from './types';
 import {
   Plus, ChevronRight, ChevronLeft, Trophy, Users, BarChart3,
   RotateCcw, X, Clock, Download, Zap, Medal, Eye, ArrowRight,
-  LogOut, Ruler, Pencil, AlertTriangle,
+  LogOut, LogIn, Ruler, Pencil, AlertTriangle,
 } from 'lucide-react';
 import logoSvg from './assets/logo.svg';
 import { cn } from './lib/utils';
+
+// ─── Event Meta ──────────────────────────────────────────────────────────────
+const EVENT_META: Record<EventType, { label: string; description: string; action: string; icon: string }> = {
+  'pole-vault':   { label: 'Pole Vault',   description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏋️' },
+  'high-jump':    { label: 'High Jump',    description: 'Bar height · entry heights', action: 'Jumping',  icon: '🏃' },
+  'long-jump':    { label: 'Long Jump',    description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘' },
+  'triple-jump':  { label: 'Triple Jump',  description: '3 attempts · distance',      action: 'Jumping',  icon: '🦘' },
+  'shot-put':     { label: 'Shot Put',     description: '3 attempts · distance',      action: 'Throwing', icon: '⚪' },
+  'discus':       { label: 'Discus',       description: '3 attempts · distance',      action: 'Throwing', icon: '🥏' },
+  'javelin':      { label: 'Javelin',      description: '3 attempts · distance',      action: 'Throwing', icon: '🏹' },
+  'hammer':       { label: 'Hammer Throw', description: '3 attempts · distance',      action: 'Throwing', icon: '🔨' },
+};
 
 // ─── Placement helpers ───────────────────────────────────────────────────────
 const PLACE_LABELS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
@@ -41,6 +53,15 @@ export default function App() {
   const [startHeightInput, setStartHeightInput] = useState('7');
   const [startHeightInchesInput, setStartHeightInchesInput] = useState('0');
   const [incrementInput, setIncrementInput] = useState('6');
+
+  // ─── Event Selection ─────────────────────────────────────────────────────────
+  const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
+
+  // ─── Distance Event State ─────────────────────────────────────────────────
+  const [distanceTab, setDistanceTab] = useState<'competing' | 'done' | 'away'>('competing');
+  const [markModalAthleteId, setMarkModalAthleteId] = useState<string | null>(null);
+  const [markFt, setMarkFt] = useState('');
+  const [markIn, setMarkIn] = useState('0');
 
   // ─── Live View State ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'jumping' | 'cleared' | 'out' | 'checkedOut' | 'upcoming'>('jumping');
@@ -110,6 +131,7 @@ export default function App() {
       if (p.startTime) setStartTime(p.startTime);
       if (p.jumpOrderIds) setJumpOrderIds(p.jumpOrderIds);
       if (p.fiveAlive !== undefined) setFiveAlive(p.fiveAlive);
+      if (p.selectedEvent) setSelectedEvent(p.selectedEvent);
     }
     const savedHistory = localStorage.getItem('vault_master_history');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
@@ -119,10 +141,13 @@ export default function App() {
     if (isStarted) {
       localStorage.setItem('vault_master_state', JSON.stringify({
         athletes, currentHeight, heights, isStarted, unit,
-        incrementInput, startTime, jumpOrderIds, fiveAlive,
+        incrementInput, startTime, jumpOrderIds, fiveAlive, selectedEvent,
       }));
     }
   }, [athletes, currentHeight, heights, isStarted, unit, incrementInput, startTime, jumpOrderIds, fiveAlive]);
+
+  // ─── Derived ────────────────────────────────────────────────────────────────
+  const isHeightEvent = selectedEvent ? HEIGHT_EVENTS.includes(selectedEvent) : true;
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
   const formatHeight = (m: number) => {
@@ -145,6 +170,21 @@ export default function App() {
     const n = parseFloat(val);
     if (isNaN(n)) return 0;
     return unit === 'metric' ? n : n * 0.0254;
+  };
+
+  const formatMark = (meters: number): string => {
+    if (unit === 'metric') return `${meters.toFixed(2)}m`;
+    const totalIn = meters / 0.0254;
+    const ft = Math.floor(totalIn / 12);
+    const inches = totalIn % 12;
+    return `${ft}' ${inches.toFixed(1).replace('.0', '')}"`;
+  };
+
+  const parseMarkToMeters = (ft: string, inches: string): number => {
+    if (unit === 'metric') return parseFloat(ft) || 0;
+    const f = parseFloat(ft) || 0;
+    const i = parseFloat(inches) || 0;
+    return (f * 12 + i) * 0.0254;
   };
 
   const recalculateConsecutiveMisses = (results: Record<number, Attempt[]>): number => {
@@ -194,6 +234,14 @@ export default function App() {
     });
   }, [athletes]);
 
+  const distanceLeaderboard = useMemo(() => {
+    return [...athletes].map(a => {
+      const marks = Object.values(a.markValues ?? {}) as number[];
+      const bestMark = marks.length > 0 ? Math.max(...marks) : 0;
+      return { ...a, bestMark, marks };
+    }).sort((a, b) => b.bestMark - a.bestMark);
+  }, [athletes]);
+
   const historyLeaderboard = useMemo(() => {
     if (!selectedHistoryItem) return [];
     const h = selectedHistoryItem.unit as Unit;
@@ -220,19 +268,27 @@ export default function App() {
   const currentJumperId = useMemo(() => {
     const eligible = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
-      if (!a || a.status === 'out' || a.checkedOut) return false;
+      if (!a || a.checkedOut) return false;
+      if (!isHeightEvent) {
+        return (a.results[0]?.length ?? 0) < 3;
+      }
+      if (a.status === 'out') return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
       return !att.includes('O') && att.length < 3;
     });
     if (eligible.length === 0) return null;
     return eligible[currentJumperIndex % eligible.length];
-  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex]);
+  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex, isHeightEvent]);
 
   const upcomingJumpers = useMemo(() => {
     const eligible = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
-      if (!a || a.status === 'out' || a.checkedOut) return false;
+      if (!a || a.checkedOut) return false;
+      if (!isHeightEvent) {
+        return (a.results[0]?.length ?? 0) < 3;
+      }
+      if (a.status === 'out') return false;
       if (a.entryHeight && a.entryHeight > currentHeight) return false;
       const att = a.results[currentHeight] ?? [];
       return !att.includes('O') && att.length < 3;
@@ -243,7 +299,7 @@ export default function App() {
       const id = eligible[(currentJumperIndex + offset) % eligible.length];
       return athletes.find(a => a.id === id) ?? null;
     }).filter((a): a is Athlete => a !== null);
-  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex]);
+  }, [jumpOrderIds, athletes, currentHeight, currentJumperIndex, isHeightEvent]);
 
   const filteredAthletes = useMemo(() => {
     const filtered = athletes.filter(athlete => {
@@ -351,12 +407,14 @@ export default function App() {
     });
     setJumpOrderIds(ordered.map(a => a.id));
     setCurrentJumperIndex(0);
-    if (heights.length === 0) {
-      const startH = parseInputToMeters(startHeightInput, startHeightInchesInput) || 2.00;
-      setHeights([startH]);
-      setCurrentHeight(startH);
-    } else {
-      setCurrentHeight(heights[0]);
+    if (isHeightEvent) {
+      if (heights.length === 0) {
+        const startH = parseInputToMeters(startHeightInput, startHeightInchesInput) || 2.00;
+        setHeights([startH]);
+        setCurrentHeight(startH);
+      } else {
+        setCurrentHeight(heights[0]);
+      }
     }
   };
 
@@ -403,7 +461,32 @@ export default function App() {
   };
 
   // ─── Competition Actions ─────────────────────────────────────────────────────
-  const recordAttempt = (athleteId: string, attempt: Attempt) => {
+  const recordAttempt = (athleteId: string, attempt: Attempt, markValue?: number) => {
+    if (!isHeightEvent) {
+      // ── Distance event ──────────────────────────────────────────────────────
+      const eligibleBefore = jumpOrderIds.filter(id => {
+        const a = athletes.find(x => x.id === id);
+        return a && !a.checkedOut && (a.results[0]?.length ?? 0) < 3;
+      });
+      const eligibleCount = eligibleBefore.length;
+
+      setAthletes(prev => prev.map(a => {
+        if (a.id !== athleteId) return a;
+        const prevAttempts = a.results[0] ?? [];
+        const newAttempts = [...prevAttempts, attempt];
+        const attemptIdx = prevAttempts.length; // index of the new attempt
+        const newMarkValues = attempt === 'O' && markValue !== undefined
+          ? { ...(a.markValues ?? {}), [attemptIdx]: markValue }
+          : a.markValues;
+        return { ...a, results: { 0: newAttempts }, markValues: newMarkValues };
+      }));
+
+      // Always advance to next athlete for distance events
+      if (eligibleCount > 1) advanceJumper();
+      return;
+    }
+
+    // ── Height event ──────────────────────────────────────────────────────────
     // Snapshot eligible athletes before the state update
     const eligibleBefore = jumpOrderIds.filter(id => {
       const a = athletes.find(x => x.id === id);
@@ -563,6 +646,7 @@ export default function App() {
   const confirmReset = () => {
     setAthletes([]); setHeights([]); setCurrentHeight(0); setIsStarted(false);
     setStartTime(null); setJumpOrderIds([]); setCurrentJumperIndex(0);
+    setSelectedEvent(null);
     localStorage.removeItem('vault_master_state');
     setModal({ type: 'none', title: '', message: '' });
     setToast('Competition reset.');
@@ -586,6 +670,85 @@ export default function App() {
     link.download = `teton-vault-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  // ─── Record Mark Modal ────────────────────────────────────────────────────
+  const renderMarkModal = () => {
+    if (!markModalAthleteId) return null;
+    const athlete = athletes.find(a => a.id === markModalAthleteId);
+    if (!athlete) return null;
+
+    const closeModal = () => { setMarkModalAthleteId(null); setMarkFt(''); setMarkIn('0'); };
+    const saveAndClose = () => {
+      const meters = parseMarkToMeters(markFt, markIn);
+      if (meters > 0) recordAttempt(markModalAthleteId, 'O', meters);
+      closeModal();
+    };
+
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="p-5 border-b border-slate-100">
+            <h3 className="text-base font-bold text-slate-900">Record Mark</h3>
+            <p className="text-sm text-slate-500">{athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}</p>
+          </div>
+          <div className="p-5">
+            {unit === 'imperial' ? (
+              <div className="flex gap-3">
+                <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
+                  <input
+                    autoFocus type="number" step="1" min="0"
+                    className="w-full outline-none text-2xl font-bold text-slate-800 bg-transparent"
+                    value={markFt} onChange={e => setMarkFt(e.target.value)}
+                    placeholder="0"
+                  />
+                  <span className="text-sm font-bold text-slate-400 shrink-0">ft</span>
+                </div>
+                <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
+                  <input
+                    type="number" step="0.25" min="0" max="11.75"
+                    className="w-full outline-none text-2xl font-bold text-slate-800 bg-transparent"
+                    value={markIn} onChange={e => setMarkIn(e.target.value)}
+                  />
+                  <span className="text-sm font-bold text-slate-400 shrink-0">in</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
+                <input
+                  autoFocus type="number" step="0.01" min="0"
+                  className="w-full outline-none text-2xl font-bold text-slate-800 bg-transparent"
+                  value={markFt} onChange={e => setMarkFt(e.target.value)}
+                  placeholder="0.00"
+                />
+                <span className="text-sm font-bold text-slate-400 shrink-0">m</span>
+              </div>
+            )}
+          </div>
+          <div className="p-4 border-t border-slate-100 space-y-2">
+            <button
+              onClick={saveAndClose}
+              disabled={parseMarkToMeters(markFt, markIn) <= 0}
+              className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-all"
+            >
+              Save Mark
+            </button>
+            <button
+              onClick={() => { recordAttempt(markModalAthleteId, 'X'); closeModal(); }}
+              className="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all"
+            >
+              Scratch (No Mark)
+            </button>
+            <button
+              onClick={closeModal}
+              className="w-full py-3 text-slate-400 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // ─── Entry Height Modal (shared between setup + live screens) ───────────────
@@ -685,6 +848,69 @@ export default function App() {
       </div>
     );
   };
+
+  // ─── Event Selection Screen ──────────────────────────────────────────────────
+  if (!selectedEvent) {
+    const heightEvents: EventType[] = ['pole-vault', 'high-jump'];
+    const distanceEvents: EventType[] = ['long-jump', 'triple-jump', 'shot-put', 'discus', 'javelin', 'hammer'];
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+        <div className="max-w-lg mx-auto">
+          <header className="mb-8 text-center pt-2">
+            <img src={logoSvg} alt="Teton Vault" className="w-20 h-20 mx-auto mb-3 drop-shadow-lg" />
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Teton Vault Officiate</h1>
+            <p className="text-slate-500 mt-1 text-sm">Select your event to get started</p>
+          </header>
+
+          <div className="space-y-6">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Bar Height Events</p>
+              <div className="grid grid-cols-2 gap-3">
+                {heightEvents.map(evt => {
+                  const meta = EVENT_META[evt];
+                  return (
+                    <button
+                      key={evt}
+                      onClick={() => setSelectedEvent(evt)}
+                      className="flex flex-col items-start gap-2 p-4 bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 active:scale-[0.97] transition-all text-left shadow-sm"
+                    >
+                      <span className="text-2xl">{meta.icon}</span>
+                      <div>
+                        <p className="font-bold text-slate-900 text-sm">{meta.label}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{meta.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Distance &amp; Throwing Events</p>
+              <div className="grid grid-cols-3 gap-3">
+                {distanceEvents.map(evt => {
+                  const meta = EVENT_META[evt];
+                  return (
+                    <button
+                      key={evt}
+                      onClick={() => setSelectedEvent(evt)}
+                      className="flex flex-col items-start gap-2 p-3 bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 active:scale-[0.97] transition-all text-left shadow-sm"
+                    >
+                      <span className="text-xl">{meta.icon}</span>
+                      <div>
+                        <p className="font-bold text-slate-800 text-xs leading-tight">{meta.label}</p>
+                        <p className="text-[9px] text-slate-400 mt-0.5">{meta.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ─── Setup Screen ────────────────────────────────────────────────────────────
   if (!isStarted) {
@@ -786,7 +1012,7 @@ export default function App() {
                 {athletes.map(a => (
                   <div key={a.id} className="flex items-center gap-2 px-3 py-2.5">
                     <button
-                      onClick={() => setEditEntryHeightId(a.id)}
+                      onClick={() => isHeightEvent && setEditEntryHeightId(a.id)}
                       className="flex items-center gap-2 flex-1 min-w-0 text-left"
                     >
                       {a.bibNumber && (
@@ -800,13 +1026,13 @@ export default function App() {
                           <p className="text-[10px] text-slate-400 uppercase tracking-wider truncate leading-tight">{a.school}</p>
                         )}
                       </div>
-                      {a.entryHeight ? (
+                      {isHeightEvent && (a.entryHeight ? (
                         <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full shrink-0 uppercase">
                           ↳ {formatHeight(a.entryHeight)}
                         </span>
                       ) : (
                         <span className="text-[10px] text-slate-300 shrink-0 italic">tap to set height</span>
-                      )}
+                      ))}
                     </button>
                     <button
                       onClick={() => removeAthlete(a.id)}
@@ -830,10 +1056,21 @@ export default function App() {
       <>
       <div className="min-h-screen bg-slate-50 p-4 md:p-8">
         <div className="max-w-lg mx-auto">
-          <header className="mb-6 text-center pt-2">
-            <img src={logoSvg} alt="Teton Vault" className="w-20 h-20 mx-auto mb-3 drop-shadow-lg" />
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Teton Vault Officiate</h1>
-            <p className="text-slate-500 mt-1 text-sm">Professional pole vault meet management</p>
+          <header className="mb-6 pt-2">
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => { setSelectedEvent(null); setAthletes([]); setHeights([]); setCurrentHeight(0); setJumpOrderIds([]); }}
+                className="p-2 -ml-1 rounded-xl text-slate-500 hover:bg-slate-200 active:scale-95 transition-all"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{selectedEvent ? EVENT_META[selectedEvent].label : ''}</span>
+            </div>
+            <div className="text-center">
+              <img src={logoSvg} alt="Teton Vault" className="w-16 h-16 mx-auto mb-3 drop-shadow-lg" />
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Teton Vault Officiate</h1>
+              <p className="text-slate-500 mt-1 text-sm">{selectedEvent ? EVENT_META[selectedEvent].label : ''}</p>
+            </div>
           </header>
 
           <div className="space-y-4">
@@ -862,8 +1099,8 @@ export default function App() {
               <ChevronRight size={18} className="text-slate-400 shrink-0" />
             </button>
 
-            {/* Competition Settings */}
-            <div className="space-y-4">
+            {/* Competition Settings — only for height events */}
+            {isHeightEvent && <div className="space-y-4">
               <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
@@ -1024,6 +1261,8 @@ export default function App() {
                 </div>
               </div>
 
+            </div>}
+
             <button
               onClick={startCompetition}
               disabled={athletes.length === 0}
@@ -1070,7 +1309,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
           </div>
         </div>
 
@@ -1118,7 +1356,336 @@ export default function App() {
     );
   }
 
-  // ─── Live Screen ─────────────────────────────────────────────────────────────
+  // ─── Distance Event Live Screen ───────────────────────────────────────────────
+  if (!isHeightEvent) {
+    const meta = EVENT_META[selectedEvent!];
+    const allDone = athletes.length > 0 && athletes.every(a => (a.results[0]?.length ?? 0) >= 3);
+    const distCompeting = athletes.filter(a => !a.checkedOut && (a.results[0]?.length ?? 0) < 3);
+    const distDone = athletes.filter(a => (a.results[0]?.length ?? 0) >= 3);
+    const distAway = athletes.filter(a => !!a.checkedOut && (a.results[0]?.length ?? 0) < 3);
+
+    const distFilteredAthletes = (() => {
+      if (distanceTab === 'competing') return distCompeting;
+      if (distanceTab === 'done') return distDone;
+      return distAway;
+    })();
+
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col relative">
+
+        {/* Toast */}
+        {toast && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10">
+              <Trophy size={18} className="text-emerald-400" />
+              <span className="text-sm font-bold">{toast}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Save / Reset Modal */}
+        {modal.type !== 'none' && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-8">
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">{modal.title}</h3>
+                <p className="text-slate-500 mb-6">{modal.message}</p>
+                {modal.type === 'save' && (
+                  <input
+                    autoFocus type="text"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none mb-6"
+                    value={modal.inputValue}
+                    onChange={(e) => setModal(prev => ({ ...prev, inputValue: e.target.value }))}
+                    onKeyDown={(e) => e.key === 'Enter' && confirmSave(modal.inputValue ?? '')}
+                  />
+                )}
+                <div className="flex gap-3">
+                  <button onClick={() => setModal({ type: 'none', title: '', message: '' })} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
+                  <button
+                    onClick={() => modal.type === 'save' ? confirmSave(modal.inputValue ?? '') : confirmReset()}
+                    className={cn('flex-1 py-3 text-white font-bold rounded-xl transition-all', modal.type === 'reset' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700')}
+                  >
+                    {modal.type === 'save' ? 'Save Meet' : 'Reset All'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {renderMarkModal()}
+
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-10 shadow-sm">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              <img src={logoSvg} alt="Teton Vault" className="w-9 h-9 rounded-lg" />
+              <div>
+                <h1 className="font-bold text-slate-900 leading-tight text-sm">{meta.label}</h1>
+                <div className="flex items-center gap-1.5">
+                  <Clock size={10} className="text-slate-400" />
+                  <span className="text-[10px] text-slate-400 font-mono font-bold">{elapsedTime}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <button
+                onClick={saveAndNew}
+                className="flex items-center gap-1.5 px-2 py-2 sm:px-4 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
+              >
+                <Trophy size={14} />
+                <span className="hidden sm:inline">Save &amp; New</span>
+              </button>
+              <button onClick={resetCompetition} className="p-2 text-slate-400 hover:text-rose-500 transition-colors" title="Reset">
+                <RotateCcw size={18} />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* All done banner */}
+        {allDone && (
+          <div className="bg-gradient-to-r from-yellow-400 to-amber-400 px-6 py-4 text-center shadow-lg">
+            <div className="flex items-center justify-center gap-3">
+              <Medal size={24} className="text-yellow-800" />
+              <span className="text-yellow-900 font-black text-xl tracking-tight">
+                Competition complete! — {distanceLeaderboard[0]?.bestMark > 0 ? `${distanceLeaderboard[0].name} leads with ${formatMark(distanceLeaderboard[0].bestMark)}` : 'No marks recorded'}
+              </span>
+              <Medal size={24} className="text-yellow-800" />
+            </div>
+          </div>
+        )}
+
+        <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4 pb-24">
+
+          {/* Now [Action] bar */}
+          {upcomingJumpers.length > 0 && activeView === 'athletes' && (
+            <div className="bg-blue-50 border border-blue-200 px-3 py-2.5 rounded-2xl mb-4 flex items-center gap-2 sm:gap-4">
+              {upcomingJumpers.map((athlete, i) => {
+                const labels = [`Now ${meta.action}`, 'On Deck', 'On Hold'];
+                return (
+                  <div key={athlete.id} className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                    {i > 0 && <div className="w-px h-8 bg-blue-200 shrink-0" />}
+                    <div className="min-w-0">
+                      <span className={`text-[9px] sm:text-[10px] font-bold uppercase block ${i === 0 ? 'text-blue-500' : 'text-blue-300'}`}>{labels[i]}</span>
+                      <span className={`text-xs sm:text-base font-bold truncate block ${i === 0 ? 'text-blue-700' : 'text-blue-400'}`}>
+                        {athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Athletes view */}
+          {activeView === 'athletes' && (
+            <>
+              {/* Tabs */}
+              <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full">
+                {([
+                  { key: 'competing' as const, label: 'Competing', count: distCompeting.length, color: 'blue' },
+                  { key: 'done' as const, label: 'Done', count: distDone.length, color: 'emerald' },
+                  { key: 'away' as const, label: 'Away', count: distAway.length, color: 'amber' },
+                ]).map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setDistanceTab(tab.key)}
+                    className={cn(
+                      'flex-1 px-2 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1 sm:gap-2',
+                      distanceTab === tab.key ? `bg-white text-${tab.color}-600 shadow-sm` : 'text-slate-500 hover:text-slate-700',
+                    )}
+                  >
+                    {tab.label}
+                    <span className={cn('px-1.5 py-0.5 rounded-full text-[10px]', distanceTab === tab.key ? `bg-${tab.color}-100 text-${tab.color}-600` : 'bg-slate-200 text-slate-500')}>
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Athlete list */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="divide-y divide-slate-100">
+                  {distFilteredAthletes.map(athlete => {
+                    const isCurrentDist = athlete.id === currentJumperId && distanceTab === 'competing';
+                    const attempts = athlete.results[0] ?? [];
+                    const canAct = !athlete.checkedOut && attempts.length < 3;
+                    const markVals = athlete.markValues ?? {};
+
+                    if (isCurrentDist) {
+                      return (
+                        <div key={athlete.id} className="px-4 pt-4 pb-3 bg-blue-50 border-l-4 border-l-blue-500">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {athlete.bibNumber && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded text-blue-400 bg-blue-100">#{athlete.bibNumber}</span>}
+                                <span className="font-bold text-blue-700 text-base">{athlete.name}</span>
+                                <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded uppercase animate-pulse">Now {meta.action}</span>
+                              </div>
+                              {athlete.school && <p className="text-xs uppercase tracking-wider text-blue-500 mt-0.5">{athlete.school}</p>}
+                            </div>
+                            {/* Attempt slots showing marks */}
+                            <div className="flex gap-1.5 items-center shrink-0">
+                              {[0, 1, 2].map(i => (
+                                <div key={i} className={cn(
+                                  'min-w-[2.5rem] h-10 rounded-lg flex items-center justify-center text-xs font-bold border px-1',
+                                  attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
+                                  attempts[i] === 'X' ? 'bg-rose-100 text-rose-600 border-rose-200' :
+                                  'bg-white text-slate-300 border-blue-200',
+                                )}>
+                                  {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {canAct && (
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => { setMarkModalAthleteId(athlete.id); setMarkFt(''); setMarkIn('0'); }}
+                                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:scale-95 transition-all"
+                              >
+                                <Ruler size={22} />
+                                <span className="text-[10px] font-bold uppercase tracking-wide">Record Mark</span>
+                              </button>
+                              <button
+                                onClick={() => recordAttempt(athlete.id, 'X')}
+                                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 active:scale-95 transition-all"
+                              >
+                                <X size={22} />
+                                <span className="text-[10px] font-bold uppercase tracking-wide">Scratch</span>
+                              </button>
+                              <button
+                                onClick={() => toggleCheckout(athlete.id)}
+                                className="flex flex-col items-center justify-center gap-1 px-4 py-3 bg-amber-100 text-amber-700 rounded-xl hover:bg-amber-200 active:scale-95 transition-all"
+                              >
+                                <LogOut size={22} />
+                                <span className="text-[10px] font-bold uppercase tracking-wide">Away</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // Non-current athlete row
+                    return (
+                      <div key={athlete.id} className={cn('px-4 py-2.5', distanceTab === 'done' ? 'bg-white' : distanceTab === 'away' ? 'bg-amber-50/50' : 'bg-white hover:bg-slate-50/50')}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate leading-snug text-slate-900">
+                              {athlete.bibNumber ? `#${athlete.bibNumber} ${athlete.name}` : athlete.name}
+                              {athlete.checkedOut && <span className="ml-1 text-[10px] font-bold text-amber-600 bg-amber-100 px-1 py-0.5 rounded uppercase">Away</span>}
+                            </p>
+                            {athlete.school && <p className="text-[10px] uppercase tracking-wider text-slate-400 leading-snug">{athlete.school}</p>}
+                          </div>
+                          {/* 3 mark slots */}
+                          <div className="flex gap-1 shrink-0">
+                            {[0, 1, 2].map(i => (
+                              <div key={i} className={cn(
+                                'min-w-[2rem] h-7 rounded flex items-center justify-center text-[10px] font-bold border px-1',
+                                attempts[i] === 'O' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                attempts[i] === 'X' ? 'bg-rose-50 text-rose-400 border-rose-100' :
+                                'bg-slate-100 text-slate-300 border-slate-200',
+                              )}>
+                                {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
+                              </div>
+                            ))}
+                          </div>
+                          {distanceTab === 'competing' && !athlete.checkedOut && (
+                            <div className="flex gap-1 shrink-0">
+                              <button onClick={() => { setMarkModalAthleteId(athlete.id); setMarkFt(''); setMarkIn('0'); }} className="p-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 active:scale-95 transition-all" title="Record Mark"><Ruler size={14} /></button>
+                              <button onClick={() => recordAttempt(athlete.id, 'X')} className="p-1.5 bg-rose-100 text-rose-600 rounded-lg hover:bg-rose-200 active:scale-95 transition-all" title="Scratch"><X size={14} /></button>
+                              <button onClick={() => toggleCheckout(athlete.id)} className="p-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 active:scale-95 transition-all" title="Away"><LogOut size={14} /></button>
+                            </div>
+                          )}
+                          {distanceTab === 'away' && (
+                            <button onClick={() => toggleCheckout(athlete.id)} className="p-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 active:scale-95 transition-all" title="Check In"><LogIn size={14} /></button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {distFilteredAthletes.length === 0 && (
+                    <div className="p-12 text-center text-slate-400 italic">
+                      {distanceTab === 'competing' ? `All athletes have completed their ${meta.label.toLowerCase()} attempts.` :
+                       distanceTab === 'done' ? 'No athletes have finished yet.' :
+                       'No athletes are currently away.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Leaderboard view — distance */}
+          {activeView === 'leaderboard' && (
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+                <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                  <Medal size={18} className="text-amber-500" />
+                  Current Standings
+                </h2>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {distanceLeaderboard.map((a, i) => (
+                  <div key={a.id} className={cn('flex items-center gap-4 px-6 py-4', i === 0 ? 'bg-yellow-50' : i === 1 ? 'bg-slate-50' : i === 2 ? 'bg-orange-50' : 'bg-white')}>
+                    <div className="w-10 shrink-0 text-center">
+                      {i < 3 ? (
+                        <span className="text-lg font-black">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
+                      ) : (
+                        <span className="text-sm font-bold text-slate-400">{getPlaceLabel(i)}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {a.bibNumber && <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">#{a.bibNumber}</span>}
+                        <span className="font-bold text-slate-900">{a.name}</span>
+                      </div>
+                      {a.school && <p className="text-xs text-slate-500 uppercase tracking-wider mt-0.5">{a.school}</p>}
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {[0, 1, 2].map(idx => {
+                          const att = (a.results[0] ?? [])[idx];
+                          const m = (a.markValues ?? {})[idx];
+                          return (
+                            <span key={idx} className={cn('text-[10px] font-mono font-bold px-1.5 py-0.5 rounded', att === 'O' && m ? 'bg-emerald-50 text-emerald-700' : att === 'X' ? 'bg-rose-50 text-rose-400' : 'bg-slate-50 text-slate-300')}>
+                              {att === 'O' && m ? formatMark(m) : att === 'X' ? 'S' : '—'}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono font-black text-lg text-slate-800">
+                        {a.bestMark > 0 ? formatMark(a.bestMark) : <span className="text-slate-300 text-base">ND</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {distanceLeaderboard.length === 0 && (
+                  <div className="p-12 text-center text-slate-400 italic">No athletes in competition yet.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* Sticky bottom nav */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-20 flex">
+          <button onClick={() => setActiveView('athletes')} className={cn('flex-1 flex flex-col items-center py-3 gap-1 transition-colors', activeView === 'athletes' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600')}>
+            <Users size={22} />
+            <span className="text-[10px] font-bold uppercase">Athletes</span>
+          </button>
+          <button onClick={() => setActiveView('leaderboard')} className={cn('flex-1 flex flex-col items-center py-3 gap-1 transition-colors', activeView === 'leaderboard' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600')}>
+            <Medal size={22} />
+            <span className="text-[10px] font-bold uppercase">Standings</span>
+          </button>
+        </nav>
+      </div>
+    );
+  }
+
+  // ─── Height Event Live Screen ─────────────────────────────────────────────────
   const nextHeight_preview = heights[heights.indexOf(currentHeight) + 1]
     ?? Number((currentHeight + (parseIncrementToMeters(incrementInput) || 0.15)).toFixed(4));
 
