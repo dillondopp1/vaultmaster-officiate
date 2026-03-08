@@ -1572,6 +1572,44 @@ export default function App() {
 
         {renderMarkModal()}
 
+        {/* Erase Confirmation Dialog (distance events) */}
+        {undoConfirmId && (() => {
+          const athlete = athletes.find(a => a.id === undoConfirmId);
+          const lastAttempt = athlete?.results[0]?.at(-1);
+          const lastIdx = (athlete?.results[0]?.length ?? 1) - 1;
+          const distMark = lastAttempt === 'O' ? athlete?.markValues?.[lastIdx] : null;
+          const attemptLabel = lastAttempt === 'O'
+            ? (distMark ? formatMark(distMark) : 'Make ✓')
+            : 'Scratch ✗';
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Erase this mark?</h3>
+                  <p className="text-sm text-slate-500 mb-5">
+                    Remove the <span className="font-bold text-slate-800">{attemptLabel}</span> recorded for{' '}
+                    <span className="font-bold text-slate-800">{athlete?.name}</span>?
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setUndoConfirmId(null)}
+                      className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { undoAttempt(undoConfirmId); setUndoConfirmId(null); }}
+                      className="flex-1 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-colors"
+                    >
+                      Erase
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-10 shadow-sm">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
