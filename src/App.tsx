@@ -67,7 +67,6 @@ export default function App() {
   // ─── Distance Event State ─────────────────────────────────────────────────
   const [distanceTab, setDistanceTab] = useState<'competing' | 'done' | 'away'>('competing');
   const [markModalAthleteId, setMarkModalAthleteId] = useState<string | null>(null);
-  const [markEditIdx, setMarkEditIdx] = useState<number | null>(null);
   const [markFt, setMarkFt] = useState('');
   const [markIn, setMarkIn] = useState('0');
   const markInRef = useRef<HTMLInputElement>(null);
@@ -614,52 +613,19 @@ export default function App() {
     }
   };
 
-  // Edit an existing distance attempt in-place (by attempt index)
-  const editAttempt = (athleteId: string, attemptIdx: number, attempt: Attempt, markValue?: number) => {
-    setAthletes(prev => prev.map(a => {
-      if (a.id !== athleteId) return a;
-      const prevAttempts = [...(a.results[0] ?? [])] as Attempt[];
-      prevAttempts[attemptIdx] = attempt;
-      const newMarkValues = { ...(a.markValues ?? {}) };
-      if (attempt === 'O' && markValue !== undefined) {
-        newMarkValues[attemptIdx] = markValue;
-      } else {
-        delete newMarkValues[attemptIdx];
-      }
-      return { ...a, results: { 0: prevAttempts }, markValues: newMarkValues };
-    }));
-  };
-
-  // Open the mark modal in edit mode for a specific attempt slot
-  const openEditModal = (athleteId: string, attemptIdx: number) => {
-    const athlete = athletes.find(a => a.id === athleteId);
-    if (!athlete) return;
-    setMarkModalAthleteId(athleteId);
-    setMarkEditIdx(attemptIdx);
-    const existingMark = athlete.markValues?.[attemptIdx];
-    if (existingMark) {
-      if (unit === 'imperial') {
-        const totalIn = existingMark / 0.0254;
-        setMarkFt(String(Math.floor(totalIn / 12)));
-        setMarkIn(String(Math.round((totalIn % 12) * 4) / 4));
-      } else {
-        setMarkFt(existingMark.toFixed(2));
-        setMarkIn('0');
-      }
-    } else {
-      setMarkFt('');
-      setMarkIn('0');
-    }
-  };
-
   const undoAttempt = (athleteId: string) => {
     setAthletes(prev => prev.map(a => {
       if (a.id !== athleteId) return a;
-      const curr = a.results[currentHeight] ?? [];
+      const heightKey = isHeightEvent ? currentHeight : 0;
+      const curr = a.results[heightKey] ?? [];
       if (curr.length === 0) return a;
-      const newResults = { ...a.results, [currentHeight]: curr.slice(0, -1) };
+      const removedIdx = curr.length - 1;
+      const newResults = { ...a.results, [heightKey]: curr.slice(0, -1) };
       const newMisses = recalculateConsecutiveMisses(newResults);
-      return { ...a, results: newResults, consecutiveMisses: newMisses, status: newMisses >= 3 ? 'out' : 'active' };
+      // Clean up markValues for the removed distance attempt
+      const newMarkValues = a.markValues ? { ...a.markValues } : undefined;
+      if (newMarkValues) delete newMarkValues[removedIdx];
+      return { ...a, results: newResults, consecutiveMisses: newMisses, status: newMisses >= 3 ? 'out' : 'active', markValues: newMarkValues };
     }));
   };
 
@@ -800,14 +766,10 @@ export default function App() {
     const athlete = athletes.find(a => a.id === markModalAthleteId);
     if (!athlete) return null;
 
-    const isEditing = markEditIdx !== null;
-    const closeModal = () => { setMarkModalAthleteId(null); setMarkFt(''); setMarkIn('0'); setMarkEditIdx(null); };
+    const closeModal = () => { setMarkModalAthleteId(null); setMarkFt(''); setMarkIn('0'); };
     const saveAndClose = () => {
       const meters = parseMarkToMeters(markFt, markIn);
-      if (meters > 0) {
-        if (isEditing) editAttempt(markModalAthleteId, markEditIdx, 'O', meters);
-        else recordAttempt(markModalAthleteId, 'O', meters);
-      }
+      if (meters > 0) recordAttempt(markModalAthleteId, 'O', meters);
       closeModal();
     };
 
@@ -815,7 +777,7 @@ export default function App() {
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
           <div className="p-5 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-900">{isEditing ? 'Edit Mark' : 'Record Mark'}</h3>
+            <h3 className="text-base font-bold text-slate-900">Record Mark</h3>
             <p className="text-sm text-slate-500">{athlete.bibNumber ? `#${athlete.bibNumber} ` : ''}{athlete.name}</p>
           </div>
           <div className="p-5">
@@ -867,14 +829,10 @@ export default function App() {
               disabled={parseMarkToMeters(markFt, markIn) <= 0}
               className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-all"
             >
-              {isEditing ? 'Update Mark' : 'Save Mark'}
+                Save Mark
             </button>
             <button
-              onClick={() => {
-                if (isEditing) editAttempt(markModalAthleteId, markEditIdx, 'X');
-                else recordAttempt(markModalAthleteId, 'X');
-                closeModal();
-              }}
+              onClick={() => { recordAttempt(markModalAthleteId, 'X'); closeModal(); }}
               className="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all"
             >
               Scratch (No Mark)
@@ -1734,23 +1692,26 @@ export default function App() {
                               </div>
                               {athlete.school && <p className="text-xs uppercase tracking-wider text-blue-500 mt-0.5">{athlete.school}</p>}
                             </div>
-                            {/* Attempt slots showing marks — tap to edit */}
+                            {/* Attempt slots — tap last filled to erase */}
                             <div className="flex gap-1.5 items-center shrink-0">
-                              {[0, 1, 2].map(i => (
-                                <div
-                                  key={i}
-                                  onClick={attempts[i] ? () => openEditModal(athlete.id, i) : undefined}
-                                  className={cn(
-                                    'min-w-[2.5rem] h-10 rounded-lg flex items-center justify-center text-xs font-bold border px-1',
-                                    attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
-                                    attempts[i] === 'X' ? 'bg-rose-100 text-rose-600 border-rose-200' :
-                                    'bg-white text-slate-300 border-blue-200',
-                                    attempts[i] ? 'cursor-pointer hover:opacity-70 active:scale-90 transition-all' : '',
-                                  )}
-                                >
-                                  {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
-                                </div>
-                              ))}
+                              {[0, 1, 2].map(i => {
+                                const isLastFilled = attempts.length > 0 && i === attempts.length - 1;
+                                return (
+                                  <div
+                                    key={i}
+                                    onClick={isLastFilled ? () => setUndoConfirmId(athlete.id) : undefined}
+                                    className={cn(
+                                      'min-w-[2.5rem] h-10 rounded-lg flex items-center justify-center text-xs font-bold border px-1',
+                                      attempts[i] === 'O' ? 'bg-emerald-500 text-white border-emerald-600' :
+                                      attempts[i] === 'X' ? 'bg-rose-100 text-rose-600 border-rose-200' :
+                                      'bg-white text-slate-300 border-blue-200',
+                                      isLastFilled ? 'cursor-pointer hover:opacity-70 active:scale-90 transition-all' : '',
+                                    )}
+                                  >
+                                    {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                           {canAct && (
@@ -1793,23 +1754,26 @@ export default function App() {
                             </p>
                             {athlete.school && <p className="text-[10px] uppercase tracking-wider text-slate-400 leading-snug">{athlete.school}</p>}
                           </div>
-                          {/* 3 mark slots — tap to edit */}
+                          {/* 3 mark slots — tap last filled to erase */}
                           <div className="flex gap-1 shrink-0">
-                            {[0, 1, 2].map(i => (
-                              <div
-                                key={i}
-                                onClick={attempts[i] ? () => openEditModal(athlete.id, i) : undefined}
-                                className={cn(
-                                  'min-w-[2rem] h-7 rounded flex items-center justify-center text-[10px] font-bold border px-1',
-                                  attempts[i] === 'O' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                                  attempts[i] === 'X' ? 'bg-rose-50 text-rose-400 border-rose-100' :
-                                  'bg-slate-100 text-slate-300 border-slate-200',
-                                  attempts[i] ? 'cursor-pointer hover:opacity-70 active:scale-90 transition-all' : '',
-                                )}
-                              >
-                                {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
-                              </div>
-                            ))}
+                            {[0, 1, 2].map(i => {
+                              const isLastFilled = attempts.length > 0 && i === attempts.length - 1;
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={isLastFilled ? () => setUndoConfirmId(athlete.id) : undefined}
+                                  className={cn(
+                                    'min-w-[2rem] h-7 rounded flex items-center justify-center text-[10px] font-bold border px-1',
+                                    attempts[i] === 'O' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                    attempts[i] === 'X' ? 'bg-rose-50 text-rose-400 border-rose-100' :
+                                    'bg-slate-100 text-slate-300 border-slate-200',
+                                    isLastFilled ? 'cursor-pointer hover:opacity-70 active:scale-90 transition-all' : '',
+                                  )}
+                                >
+                                  {attempts[i] === 'O' && markVals[i] ? formatMark(markVals[i]) : attempts[i] === 'X' ? 'S' : ''}
+                                </div>
+                              );
+                            })}
                           </div>
                           {distanceTab === 'competing' && !athlete.checkedOut && (
                             <div className="flex gap-1 shrink-0">
@@ -1962,8 +1926,13 @@ export default function App() {
       {/* Undo Confirmation Dialog */}
       {undoConfirmId && (() => {
         const athlete = athletes.find(a => a.id === undoConfirmId);
-        const lastAttempt = athlete?.results[currentHeight]?.at(-1);
-        const attemptLabel = lastAttempt === 'O' ? 'Make ✓' : lastAttempt === 'X' ? 'Miss ✗' : 'Pass —';
+        const heightKey = isHeightEvent ? currentHeight : 0;
+        const lastAttempt = athlete?.results[heightKey]?.at(-1);
+        const lastIdx = (athlete?.results[heightKey]?.length ?? 1) - 1;
+        const distMark = !isHeightEvent && lastAttempt === 'O' ? athlete?.markValues?.[lastIdx] : null;
+        const attemptLabel = lastAttempt === 'O'
+          ? (distMark ? formatMark(distMark) : 'Make ✓')
+          : lastAttempt === 'X' ? 'Scratch ✗' : 'Pass —';
         return (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
